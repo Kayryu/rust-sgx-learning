@@ -59,8 +59,8 @@ SGX_COMMON_CFLAGS += -fstack-protector
 
 CUSTOM_LIBRARY_PATH := ./lib
 CUSTOM_BIN_PATH := ./bin
-CUSTOM_EDL_PATH := ../../rust-sgx-sdk/edl
-CUSTOM_COMMON_PATH := ../../rust-sgx-sdk/common
+CUSTOM_EDL_PATH := ../rust-sgx-sdk/edl
+CUSTOM_COMMON_PATH := ../rust-sgx-sdk/common
 
 ######## EDL Settings ########
 

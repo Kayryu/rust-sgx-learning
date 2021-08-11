@@ -10,3 +10,5 @@
 * 一份 Remote Attestation 实现 [linux-sgx-remoteattestation](https://github.com/svartkanin/linux-sgx-remoteattestation)
 * 一[Intel SGX Explained](https://eprint.iacr.org/2016/086.pdf) 
 * [SGX-hardware](https://github.com/ayeks/SGX-hardware) 
+* [Intel SGX develop](https://software.intel.com/content/www/us/en/develop/articles/intel-sgx-web-based-training.html)
+* [Intel sample code](https://github.com/intel/linux-sgx)

@@ -1,10 +1,10 @@
 [package]
-name = "typesample"
+name = "projectsample"
 version = "1.0.0"
 authors = ["The Teaclave Authors"]
 
 [lib]
-name = "typesample" # Library name. If you change this, please reflect those changes in the Makefile on the variable ENCLAVE_CARGO_LIB
+name = "projectsample" # Library name. If you change this, please reflect those changes in the Makefile on the variable ENCLAVE_CARGO_LIB
 crate-type = ["staticlib"]
 
 [features]

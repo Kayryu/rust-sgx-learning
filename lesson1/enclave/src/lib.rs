@@ -15,7 +15,7 @@
 // specific language governing permissions and limitations
 // under the License..
 
-#![crate_name = "typesample"]
+#![crate_name = "projectsample"]
 #![crate_type = "staticlib"]
 
 #![cfg_attr(not(target_env = "sgx"), no_std)]

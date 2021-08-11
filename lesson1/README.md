@@ -30,7 +30,3 @@ The project files:
 # Build
 
 By default, your project will be compiled in hardware mode. If you wish to compile your project in software/simulation mode, you will need to specify it, either by adding ```SGX_MODE=SW``` before make, or by setting the SGX_MODE variable environment to SW.
-
-# Types
-
-https://dingelish.github.io/sgx_types/sgx_types/index.html

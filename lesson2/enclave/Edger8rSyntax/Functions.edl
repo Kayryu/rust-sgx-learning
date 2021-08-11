@@ -1,0 +1,41 @@
+/* Functions.edl - Samples for function attributes. */
+
+enclave {
+    
+    /* 
+     * Following keywords/attributes are supported for untrusted functions: 
+     *      cdecl, stdcall, fastcall, dllimport (only for Windows).
+     *      [public] is only supported for the trusted functions.
+     * Trusted function will be treated as [private] w/o the [public].
+     */
+
+    trusted {
+
+        /*
+         * [public]:
+         *      public ECALL can be called directly in App.
+         */
+        
+        public void ecall_function_public(void);
+
+        /*
+         * [private]:
+         *      private ECALL cannot be called directly in App.
+         */
+        
+        int ecall_function_private(void);
+    
+    };
+
+    untrusted {
+        
+        /*
+         * [allow]:
+         *      OCALL 'ocall_function_allow' can invoke ECALL 'ecall_function_private' in App side. 
+         *
+         * Note: No ECALL can be called in OCALL w/o [allow].
+         */
+        
+        void ocall_function_allow(void) allow(ecall_function_private);
+    
+    };

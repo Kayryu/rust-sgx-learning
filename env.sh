@@ -13,7 +13,11 @@ if [ -z "$id" ]; then
         ep=$(echo $ep | awk -F '/[^/]*$' '{print $1}')
     fi
 
-    docker run -v $ep:/root/sgx-learning --name $name -it baiduxlab/sgx-rust
+    if [ "$1" == "SM" ]; then
+        docker run -v $ep:/root/sgx-learning --name $name -it baiduxlab/sgx-rust
+    else
+        docker run -v $ep:/root/sgx-learning --name $name --device /dev/sgx/enclave --device /dev/sgx/provision -it baiduxlab/sgx-rust
+    fi
 else
     docker start $name
     docker exec -it $name bash

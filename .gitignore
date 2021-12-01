@@ -15,3 +15,10 @@
 /**/*_u.h
 /**/*_t.c
 /**/*_t.h
+
+#app
+app
+!app/
+
+#cargo.lock
+Cargo.lock

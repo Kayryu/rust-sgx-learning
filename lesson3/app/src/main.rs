@@ -25,13 +25,15 @@ use lazy_static::lazy_static;
 use std::sync::Mutex;
 use std::collections::HashMap;
 use std::slice;
+use std::fs;
+use std::sync::Arc;
 
 type Bytes = Vec<u8>;
-
+type DBMAP = HashMap<String, Bytes>;
 static ENCLAVE_FILE: &'static str = "enclave.signed.so";
 
 lazy_static! {
-    pub static ref DATABASE: Mutex<HashMap<Bytes, Bytes>> = {
+    pub static ref DATABASE: Mutex<DBMAP> = {
         let db = HashMap::new();
         Mutex::new(db)
     };
@@ -51,12 +53,13 @@ pub extern "C" fn save_to_untrusted_db(
     let db_key = unsafe {
         slice::from_raw_parts(key_pointer, key_size as usize)
     };
+    let key = String::from_utf8(db_key.to_vec()).unwrap();
 
     DATABASE
         .lock()
         .unwrap()
         .insert(
-            db_key.to_vec(),
+            key,
             db_data.to_vec(),
         );
 
@@ -75,27 +78,21 @@ pub extern "C" fn load_from_untrusted_db(
         slice::from_raw_parts(key_pointer, key_size as usize)
     };
 
-    let mut data = DATABASE
+    let key = String::from_utf8(db_key.to_vec()).unwrap();
+    let data = DATABASE
         .lock()
         .unwrap()
-        [db_key]
+        [&key]
         .clone();
 
-    let data_length = data.len() as u32;
-    let mut final_bytes_to_copy: Vec<u8> = data_length
-        .to_le_bytes()
-        .to_vec();
-
-    final_bytes_to_copy.append(&mut data);
-
     unsafe {
-        if value_size < final_bytes_to_copy.len() as u32 {
+        if value_size < data.len() as u32 {
             return sgx_status_t::SGX_ERROR_OUT_OF_MEMORY;
         }
         copy_nonoverlapping(
-            &final_bytes_to_copy[0] as *const u8,
+            &data[0] as *const u8,
             value_pointer,
-            final_bytes_to_copy.len()
+            data.len()
         )
     }
     sgx_status_t::SGX_SUCCESS
@@ -106,6 +103,7 @@ pub extern "C" fn load_from_untrusted_db(
 extern {
     fn say_something(eid: sgx_enclave_id_t, retval: *mut sgx_status_t,
                      some_string: *const u8, len: usize) -> sgx_status_t;
+    fn verify(eid: sgx_enclave_id_t, retval: *mut sgx_status_t) -> sgx_status_t;
 }
 
 fn init_enclave() -> SgxResult<SgxEnclave> {
@@ -122,6 +120,25 @@ fn init_enclave() -> SgxResult<SgxEnclave> {
                        &mut misc_attr)
 }
 
+fn load_db() {
+    let contents:String = fs::read_to_string(&std::path::Path::new("data.txt")).unwrap();
+    let data = serde_json::from_str::<DBMAP>(&contents).unwrap();
+    let mut db = DATABASE.lock().unwrap();
+    data.into_iter().for_each(|(k,v)| {
+        db.insert(k, v);
+    });
+}
+
+fn save_db() {
+    let db = DATABASE.lock().unwrap();
+    let mut tmp:DBMAP = HashMap::new();
+    db.iter().for_each(|(k,v)| {
+        tmp.insert(k.clone(), v.clone());
+    });
+    let contents = serde_json::to_string(&tmp).unwrap();
+    fs::write(&std::path::Path::new("data.txt"), contents).unwrap();
+}
+
 fn main() {
     let enclave = match init_enclave() {
         Ok(r) => {
@@ -135,6 +152,9 @@ fn main() {
     };
 
     let input_string = String::from("Sealing SGX Data into an Untrusted Database!\n");
+    // let mut mock_data = [0x64u8; 10_000].to_vec();
+    // mock_data[9_999] = 0x64;
+    // let input_string = String::from_utf8(mock_data).unwrap();
     let mut retval = sgx_status_t::SGX_SUCCESS;
 
     let result = unsafe {
@@ -143,6 +163,11 @@ fn main() {
                       input_string.as_ptr() as * const u8,
                       input_string.len())
     };
+    // let result = unsafe {
+    //     load_db();
+    //     verify(enclave.geteid(),
+    //                   &mut retval)
+    // };
     match result {
         sgx_status_t::SGX_SUCCESS => {},
         _ => {
@@ -154,4 +179,6 @@ fn main() {
     println!("{:?}", DATABASE.lock());
     println!("[+] say_something success...");
     enclave.destroy();
+
+    save_db();
 }

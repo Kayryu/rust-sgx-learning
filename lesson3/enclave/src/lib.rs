@@ -98,19 +98,16 @@ fn from_sealed_log_for_slice<'a, T: Copy + ContiguousMemory>(
     }
 }
 
-/// implement say_something.
-#[no_mangle]
-pub extern "C" fn say_something(some_string: *const u8, some_len: usize) -> sgx_status_t {
-
-    let str_slice = unsafe { slice::from_raw_parts(some_string, some_len) };
-    let _ = io::stdout().write(str_slice);
-
-    let extra_data: [u8; 0] = [0u8; 0];
-    let key: [u8; 2] = [0x32, 0x32];
-    let text: [u8; 4] = [0x01, 0x02, 0x03, 0x04];
-
+fn seal_item(key: &[u8], value: &[u8]) -> sgx_status_t {
+    let extra_data: [u8; 1] = [0x77u8; 1]; // the extra data will append to seal raw data.
     // seal data
-    let result = SgxSealedData::<[u8]>::seal_data(&extra_data, &text);
+    let key_policy = SGX_KEYPOLICY_MRENCLAVE;
+    let attribute_mask = sgx_attributes_t {
+        flags: TSEAL_DEFAULT_FLAGSMASK,
+        xfrm: 0,
+    };
+    let misc_mask = TSEAL_DEFAULT_MISCMASK;
+    let result = SgxSealedData::<[u8]>::seal_data_ex(key_policy, attribute_mask, misc_mask, &extra_data, &value);
     let sealed_data = match result {
         Ok(data) => data,
         Err(e) => return e,
@@ -143,8 +140,13 @@ pub extern "C" fn say_something(some_string: *const u8, some_len: usize) -> sgx_
         save_to_untrusted_db(&mut sgx_status_t::SGX_SUCCESS, key_ptr, key.len() as u32,
             sealed_log_ptr, sealed_log_size as u32);
     }
-    
+    return sgx_status_t::SGX_SUCCESS;
+}
+
+fn unseal_item(key: &[u8]) -> sgx_status_t {
     // load from db
+    let key_ptr = key.as_ptr() as *const u8;
+
     let mut sealed_view:[u8; MAX_SEALED_LOG_BYTE] = [0u8; MAX_SEALED_LOG_BYTE];
     let sealed_view_ptr = sealed_view.as_mut_ptr() as *mut u8;
     unsafe {
@@ -153,7 +155,7 @@ pub extern "C" fn say_something(some_string: *const u8, some_len: usize) -> sgx_
     }
 
     // unseal data
-    let opt = from_sealed_log_for_slice::<u8>(sealed_log_ptr, sealed_log_size as u32);
+    let opt = from_sealed_log_for_slice::<u8>(sealed_view_ptr, MAX_SEALED_LOG_BYTE as u32);
     let sealed_data = match opt {
         Some(sealed_data) => sealed_data,
         None => return sgx_status_t::SGX_ERROR_INVALID_PARAMETER,
@@ -167,9 +169,35 @@ pub extern "C" fn say_something(some_string: *const u8, some_len: usize) -> sgx_
     println!("[SGX] Unseal-data additional data {:?}", unsealed_data.get_additional_txt()); 
     println!("[SGX] Unseal-data decrypted data {:?}", unsealed_data.get_decrypt_txt()); 
     println!("[SGX] Unseal-data payload size {:?}", unsealed_data.get_payload_size()); 
+    return sgx_status_t::SGX_SUCCESS;
+}
+
+/// implement say_something.
+#[no_mangle]
+pub extern "C" fn say_something(some_string: *const u8, some_len: usize) -> sgx_status_t {
+
+    let str_slice = unsafe { slice::from_raw_parts(some_string, some_len) };
+    let _ = io::stdout().write(str_slice);
+    let key: [u8; 2] = [0x32, 0x32];
+
+    let r = seal_item(&key, &str_slice);
+    if r != sgx_status_t::SGX_SUCCESS {
+        return r;
+    }
+    
+    let r = unseal_item(&key);
+    if r != sgx_status_t::SGX_SUCCESS {
+        return r;
+    }
 
     // Ocall to normal world for output
     println!("[SGX] {}", "SGX_SUCCESS");
 
     sgx_status_t::SGX_SUCCESS
+}
+
+#[no_mangle]
+pub extern "C" fn verify() -> sgx_status_t {
+    let key: [u8; 2] = [0x32, 0x32];
+    return unseal_item(&key);
 }

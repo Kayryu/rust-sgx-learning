@@ -1,5 +1,6 @@
 #![crate_name = "tlsEnclave"]
 #![crate_type = "staticlib"]
+
 #![cfg_attr(not(target_env = "sgx"), no_std)]
 #![cfg_attr(target_env = "sgx", feature(rustc_private))]
 #![warn(unused_extern_crates)]

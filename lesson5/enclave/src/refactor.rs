@@ -14,6 +14,8 @@ cargo.toml
 
 
 关于不同平台包重名问题，参考https://github.com/Phala-Network/khala-parachain/blob/main/pallets/phala/Cargo.toml#L41处理。
+命令行工具 https://github.com/CGair23/ura/blob/master/cmd_ura/src/main.rs
+
 */
 
 

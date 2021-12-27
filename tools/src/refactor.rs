@@ -18,7 +18,6 @@ cargo.toml
 
 */
 
-
 enum Error {
     NetError(String),
     SGXError(sgx_status_t),
@@ -30,7 +29,7 @@ extern "C" {
         ret_ti: *mut sgx_target_info_t,
         ret_gid: *mut sgx_epid_group_id_t,
     ) -> sgx_status_t;
-    
+
     pub fn ocall_get_ias_socket(ret_val: *mut sgx_status_t, ret_fd: *mut i32) -> sgx_status_t;
 
     pub fn ocall_get_quote(
@@ -51,7 +50,7 @@ extern "C" {
 struct AttestationReport {
     ra_report: Vec<u8>,
     signature: Vec<u8>,
-    raw_cert: Vec<u8>
+    raw_cert: Vec<u8>,
 }
 
 pub const DEV_HOSTNAME: &'static str = "api.trustedservices.intel.com";
@@ -63,28 +62,26 @@ struct Net {
     pub isa_key: String,
 }
 
+// todo use http_req https://github.com/mesalock-linux/http_req-sgx/blob/5d0f7474c7/examples/request_builder_get.rs
 
 impl Net {
     pub fn new(spid: String, isa_key: String) -> Self {
         let spid = Utils::decode_spid(spid);
-        Self {
-            spid,
-            isa_key
-        }
+        Self { spid, isa_key }
     }
-    
-    pub fn get_sigrl(&self, gid: u32) -> Vec<u8> {
+
+    pub fn get_sigrl(&self, gid: u32) -> Result<Vec<u8>, Error> {
         let request = format!(
             "GET {}{:08x} HTTP/1.1\r\nHOST: {}\r\nOcp-Apim-Subscription-Key: {}\r\nConnection: Close\r\n\r\n",
             SIGRL_SUFFIX, gid, DEV_HOSTNAME, self.isa_key
         );
 
-        let resp = self.send(request).unwrap();
+        let resp = self.send(request)?;
 
         // parse http response
     }
 
-    pub fn get_report(&self, quote: Vec<u8>) -> AttestationReport {
+    pub fn get_report(&self, quote: Vec<u8>) -> Result<AttestationReport, Error> {
         let encoded_quote = base64::encode(&quote[..]);
         let encoded_json = format!("{{\"isvEnclaveQuote\":\"{}\"}}\r\n", encoded_quote);
 
@@ -95,10 +92,9 @@ impl Net {
                             encoded_json.len(),
                             encoded_json);
 
-        let resp = self.send(request).unwrap();
+        let resp = self.send(request)?;
 
         // parse http response
-
     }
 
     fn send(&self, request: String) -> Result<String, Error> {
@@ -112,35 +108,31 @@ impl Net {
         let mut plaintext = Vec::new();
         match tls.read_to_end(&mut plaintext) {
             Ok(_) => (),
-            Err(e) => {
-                return NetError()
-            }
+            Err(e) => return NetError(),
         }
         let response = String::from_utf8(plaintext.clone()).unwrap();
     }
 
     fn make_ias_client_config() -> rustls::ClientConfig {
         let mut config = rustls::ClientConfig::new();
-    
+
         config
             .root_store
             .add_server_trust_anchors(&webpki_roots::TLS_SERVER_ROOTS);
-    
+
         config
     }
 }
 
 #[derive(Default)]
-struct SgxCall {
-
-}
+struct SgxCall {}
 
 impl SgxCall {
     fn init_quote() -> Result<(sgx_target_info_t, sgx_epid_group_id_t), Error> {
         let mut rt: sgx_status_t = sgx_status_t::SGX_ERROR_UNEXPECTED;
         let mut ti: sgx_target_info_t = sgx_target_info_t::default();
         let mut eg: sgx_epid_group_id_t = sgx_epid_group_id_t::default();
-        
+
         let res = unsafe {
             ocall_sgx_init_quote(
                 &mut rt as *mut sgx_status_t,
@@ -175,9 +167,15 @@ impl SgxCall {
         }
     }
 
-    fn get_quote(quote_type: sgx_quote_sign_type_t, sigrl:&[u8], report: &sgx_report_t, spid:&sgx_spid_t, quote_nonce: &sgx_quote_nonce_t) -> Result<(sgx_report_t, Vec<u8>), Error> {
+    fn get_quote(
+        quote_type: sgx_quote_sign_type_t,
+        sigrl: &[u8],
+        report: &sgx_report_t,
+        spid: &sgx_spid_t,
+        quote_nonce: &sgx_quote_nonce_t,
+    ) -> Result<(sgx_report_t, Vec<u8>), Error> {
         let mut rt: sgx_status_t = sgx_status_t::SGX_ERROR_UNEXPECTED;
-        
+
         const RET_QUOTE_BUF_LEN: u32 = 2048;
         let mut qe_report = sgx_report_t::default();
         let mut quote_buf: Vec<u8> = Vec::with_capacity(RET_QUOTE_BUF_LEN);
@@ -214,12 +212,12 @@ impl SgxCall {
                 &mut quote_len as *mut u32,
             )
         };
-    
+
         if result != sgx_status_t::SGX_SUCCESS {
             error!("ocall_get_quote result={}", result);
             return Err(Error::SGXError(result));
         }
-    
+
         if rt != sgx_status_t::SGX_SUCCESS {
             error!("ocall_get_quote rt={}", rt);
             return Err(Error::SGXError(rt));
@@ -230,9 +228,7 @@ impl SgxCall {
     }
 }
 
-struct Attestation {
-    
-}
+struct Attestation {}
 
 fn as_u32_le(array: &[u8; 4]) -> u32 {
     ((array[0] as u32) << 0) + ((array[1] as u32) << 8) + ((array[2] as u32) << 16) + ((array[3] as u32) << 24)
@@ -240,12 +236,16 @@ fn as_u32_le(array: &[u8; 4]) -> u32 {
 
 impl Attestation {
     pub fn new() {
-        Self {
-
-        }
+        Self {}
     }
     // the funciton only executed in encalve.
-    pub fn create_report(&self, net: &Net, ocall: &SgxCall, addition: &[u8], quote_type: sgx_quote_sign_type_t) -> Result<AttestationReport, Error> {
+    pub fn create_report(
+        &self,
+        net: &Net,
+        ocall: &SgxCall,
+        addition: &[u8],
+        quote_type: sgx_quote_sign_type_t,
+    ) -> Result<AttestationReport, Error> {
         // Workflow:
         // (1) ocall to get the target_info structure (ti) and epid group id (eg)
         // (1.5) get sigrl
@@ -259,7 +259,7 @@ impl Attestation {
         // Fill data into report_data
         let mut report_data: sgx_report_data_t = sgx_report_data_t::default();
         report_data.d[..addition.len()].clone_from_slice(addition);
-        let report = match rsgx_create_report(&ti, &report_data).map_err(|e| {
+        let report = rsgx_create_report(&ti, &report_data).map_err(|e| {
             error!("Report creation failed {}", e);
             return Err(Error::SGXError(e));
         })?;
@@ -273,8 +273,8 @@ impl Attestation {
         rsgx_verify_report(&qe_report)?;
 
         if ti.mr_enclave.m != qe_report.body.mr_enclave.m
-        || ti.attributes.flags != qe_report.body.attributes.flags
-        || ti.attributes.xfrm != qe_report.body.attributes.xfrm
+            || ti.attributes.flags != qe_report.body.attributes.flags
+            || ti.attributes.xfrm != qe_report.body.attributes.xfrm
         {
             error!("qe_report does not match current target_info!");
             return Err(SGXError(sgx_status_t::SGX_ERROR_UNEXPECTED));
@@ -282,10 +282,8 @@ impl Attestation {
 
         self.defend_replay()?;
 
-        let (attn_report, sig, cert) = net.get_report(quote_buf).unwrap();
-        return Ok(AttestationReport{
-
-        })
+        let (attn_report, sig, cert) = net.get_report(quote_buf)?;
+        return Ok(AttestationReport {});
     }
 
     // Check qe_report to defend against replay attack
@@ -319,18 +317,14 @@ impl Attestation {
 }
 
 // X. 509 certificate
-struct RaX509Cert {
-    
-}
+struct RaX509Cert {}
 
 impl RaX509Cert {
     pub fn generate(report: &AttestationReport) -> Vec<u8> {
         unimplemented!()
     }
 
-    pub fn verify(cert: &Vec<u8>) -> bool {
-
-    }
+    pub fn verify(cert: &Vec<u8>) -> bool {}
 }
 
 pub fn gen_ecc_cert_with_sign_type(sign_type: sgx_quote_sign_type_t) -> Result<(Vec<u8>, Vec<u8>), Error> {
@@ -355,7 +349,9 @@ pub fn gen_ecc_cert_with_sign_type(sign_type: sgx_quote_sign_type_t) -> Result<(
     Ok((key_der, cert_der))
 }
 
-struct Utils {
+struct Utils {}
+
+impl Utils {
     fn decode_spid() -> sgx_spid_t {
         unimplemented!();
     }
@@ -373,12 +369,11 @@ mod tests {
 
         // init ocall
         let ocall = SgxCall::default();
-
-
-        let report = Attestation::create_report(&net, &ocall).unwrap();
+        let sign_type = sgx_quote_sign_type_t::SGX_LINKABLE_SIGNATURE;
+        let report = Attestation::new().create_report(&net, &ocall, sign_type).unwrap();
         assert!(Attestation::verify(&report));
 
-        let cert = RaX509Cert::generate(&report).unwrap()
+        let cert = RaX509Cert::generate(&report).unwrap();
         assert!(RaX509Cert::verify(&cert));
     }
 }

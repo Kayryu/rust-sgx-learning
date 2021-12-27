@@ -21,7 +21,7 @@ cargo.toml
 
 enum Error {
     NetError(String),
-    SGXERROR(sgx_status_t),
+    SGXError(sgx_status_t),
 }
 
 extern "C" {
@@ -54,8 +54,6 @@ struct AttestationReport {
 
 
 
-
-
 pub const DEV_HOSTNAME: &'static str = "api.trustedservices.intel.com";
 pub const SIGRL_SUFFIX: &'static str = "/sgx/dev/attestation/v3/sigrl/";
 pub const REPORT_SUFFIX: &'static str = "/sgx/dev/attestation/v3/report";
@@ -81,7 +79,8 @@ impl Net {
             SIGRL_SUFFIX, gid, DEV_HOSTNAME, self.key
         );
 
-        let self.send(request).unwrap();
+        let resp = self.send(request).unwrap();
+
         // parse http response
     }
 
@@ -96,10 +95,10 @@ impl Net {
                             encoded_json.len(),
                             encoded_json);
 
-        self.send(request).unwrap();
+        let resp = self.send(request).unwrap();
 
         // parse http response
-        
+
     }
 
     fn send(&self, request: String) -> Result<String, Error> {
@@ -131,9 +130,6 @@ impl Net {
     }
 }
 
-
-
-
 #[derive(Default)]
 struct TrustCall {
 
@@ -156,11 +152,11 @@ impl TrustCall {
         debug!("eg = {:?}", eg);
 
         if res != sgx_status_t::SGX_SUCCESS {
-            return Err(Error::SGXERROR(res));
+            return Err(ErrError(res));
         }
 
         if rt != sgx_status_t::SGX_SUCCESS {
-            return Err(Error::SGXERROR(rt));
+            return Err(ErrError(rt));
         }
 
         return (ti, eg);
@@ -173,23 +169,53 @@ impl TrustCall {
         let res = unsafe { ocall_get_ias_socket(&mut rt as *mut sgx_status_t, &mut ias_sock as *mut i32) };
 
         if res != sgx_status_t::SGX_SUCCESS {
-            return Err(Error::SGXERROR(res));
+            return Err(ErrError(res));
         }
 
         if rt != sgx_status_t::SGX_SUCCESS {
-            return Err(Error::SGXERROR(rt));
+            return Err(ErrError(rt));
         }
     }
 
-    fn get_quote() -> Result<>
+    fn get_quote() -> Result<> {
+
+    }
 }
 
 struct Attestation {
 }
 
+fn as_u32_le(array: &[u8; 4]) -> u32 {
+    ((array[0] as u32) << 0) + ((array[1] as u32) << 8) + ((array[2] as u32) << 16) + ((array[3] as u32) << 24)
+}
+
 impl Attestation {
-    fn create_report() -> Result<AttestationReport, Error> {
-        unimplemented!()
+    fn create_report(net: &Net, ocall: &TrustCall, addition: &[u8]) -> Result<AttestationReport, Error> {
+        // Workflow:
+        // (1) ocall to get the target_info structure (ti) and epid group id (eg)
+        // (1.5) get sigrl
+        // (2) call sgx_create_report with ti+data, produce an sgx_report_t
+        // (3) ocall to sgx_get_quote to generate (*mut sgx-quote_t, uint32_t)
+
+        let (mut ti, mut eg) = ocall.init_quote().unwrap();
+
+        let gid: u32 = as_u32_le(&eg);
+
+        let sigrl_vec: Vec<u8> = net.get_sigrl(gid).unwrap();
+
+        let mut report_data: sgx_report_data_t = sgx_report_data_t::default();
+        // Fill data into report_data
+        report_data.d[..addition.len()].clone_from_slice(addition);
+        let rep = match rsgx_create_report(&ti, &report_data) {
+            Ok(r) => {
+                debug!("Report creation => success {:?}", r.body.mr_signer.m);
+                Some(r)
+            }
+            Err(e) => {
+                error!("Report creation => failed {:?}", e);
+                return Err(Error::);
+            }
+        };
     }
 
     fn verify(report: &AttestationReport) -> bool {

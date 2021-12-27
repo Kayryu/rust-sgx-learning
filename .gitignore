@@ -22,3 +22,6 @@ app
 
 #cargo.lock
 Cargo.lock
+
+key.txt
+spid.txt

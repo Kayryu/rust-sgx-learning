@@ -17,3 +17,12 @@
 * [SGX-hardware](https://github.com/ayeks/SGX-hardware) 
 * [Intel SGX develop](https://software.intel.com/content/www/us/en/develop/articles/intel-sgx-web-based-training.html)
 * [Intel sample code](https://github.com/intel/linux-sgx)
+
+
+# 如何开发
+
+执行 `env.sh` 脚本，然后跳转到 `sgx-learning` 下的相应目录。  
+修改 对应
+执行 `make` 命令， 会在`bin`目录下生产`app`可执行文件，执行`app`查看结果。
+
+>> 如果出现ra访问失败，执行`LD_LIBRARY_PATH="/opt/intel/sgx-aesm-service/aesm:$LD_LIBRARY_PATH" nohup /opt/intel/sgx-aesm-service/aesm/aesm_service --no-daemon >/dev/null 2>&1 &`

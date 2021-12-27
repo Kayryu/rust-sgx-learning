@@ -54,31 +54,29 @@ struct AttestationReport {
     raw_cert: Vec<u8>
 }
 
-
-
 pub const DEV_HOSTNAME: &'static str = "api.trustedservices.intel.com";
 pub const SIGRL_SUFFIX: &'static str = "/sgx/dev/attestation/v3/sigrl/";
 pub const REPORT_SUFFIX: &'static str = "/sgx/dev/attestation/v3/report";
 
 struct Net {
     pub spid: sgx_spid_t,
-    pub key: String,
+    pub isa_key: String,
 }
 
 
 impl Net {
-    pub fn new(spid: String, key: String) -> Self {
+    pub fn new(spid: String, isa_key: String) -> Self {
         let spid = Utils::decode_spid(spid);
         Self {
             spid,
-            key
+            isa_key
         }
     }
     
     pub fn get_sigrl(&self, gid: u32) -> Vec<u8> {
         let request = format!(
             "GET {}{:08x} HTTP/1.1\r\nHOST: {}\r\nOcp-Apim-Subscription-Key: {}\r\nConnection: Close\r\n\r\n",
-            SIGRL_SUFFIX, gid, DEV_HOSTNAME, self.key
+            SIGRL_SUFFIX, gid, DEV_HOSTNAME, self.isa_key
         );
 
         let resp = self.send(request).unwrap();
@@ -177,7 +175,7 @@ impl OutCall {
         }
     }
 
-    fn get_quote(quote_type: sgx_quote_sign_type_t, sigrl:&[u8], report: &sgx_report_t, spid:&sgx_spid_t, quote_nonce: &sgx_quote_nonce_t) -> Result<(sgx_report_t, Vec<u8>, u32), Error> {
+    fn get_quote(quote_type: sgx_quote_sign_type_t, sigrl:&[u8], report: &sgx_report_t, spid:&sgx_spid_t, quote_nonce: &sgx_quote_nonce_t) -> Result<(sgx_report_t, Vec<u8>), Error> {
         let mut rt: sgx_status_t = sgx_status_t::SGX_ERROR_UNEXPECTED;
         
         const RET_QUOTE_BUF_LEN: u32 = 2048;
@@ -227,7 +225,8 @@ impl OutCall {
             return Err(Error::SGXError(rt));
         }
 
-        return Ok(qe_report, quote_buf， quote_len);
+        quote_buf.trunk(quote_len);
+        return Ok(qe_report, quote_buf);
     }
 }
 
@@ -241,13 +240,12 @@ fn as_u32_le(array: &[u8; 4]) -> u32 {
 
 impl Attestation {
     // the funciton only executed in encalve.
-    fn create_report(&self, net: &Net, ocall: &OutCall, addition: &[u8], quote_type: sgx_quote_sign_type_t) -> Result<AttestationReport, Error> {
+    pub fn create_report(&self, net: &Net, ocall: &OutCall, addition: &[u8], quote_type: sgx_quote_sign_type_t) -> Result<AttestationReport, Error> {
         // Workflow:
         // (1) ocall to get the target_info structure (ti) and epid group id (eg)
         // (1.5) get sigrl
         // (2) call sgx_create_report with ti+data, produce an sgx_report_t
         // (3) ocall to sgx_get_quote to generate (*mut sgx-quote_t, uint32_t)
-
         let (ti, eg) = ocall.init_quote()?;
 
         let gid: u32 = as_u32_le(&eg);
@@ -257,7 +255,7 @@ impl Attestation {
         let mut report_data: sgx_report_data_t = sgx_report_data_t::default();
         report_data.d[..addition.len()].clone_from_slice(addition);
         let report = match rsgx_create_report(&ti, &report_data).map_err(|e| {
-            error!("Report creation => failed {:?}", e);
+            error!("Report creation failed {}", e);
             return Err(Error::SGXError(e));
         })?;
 
@@ -265,16 +263,52 @@ impl Attestation {
         let mut quote_nonce = sgx_quote_nonce_t { rand: [0; 16] };
         let mut os_rng = rand::thread_rng();
         os_rng.fill_bytes(&mut quote_nonce.rand);
-        let (qe_report, quote_buf, quote_len) = ocall.get_quote(quote_type, &sigrl, &report, &net.spid, &quote_nonce)?;
+        let (qe_report, quote_buf) = ocall.get_quote(quote_type, &sigrl, &report, &net.spid, &quote_nonce)?;
 
-        let quote: Vec<u8> = quote_buf[..quote_len as usize].to_vec();
-        let (attn_report, sig, cert) = net.get_report(quote).unwrap();
+        rsgx_verify_report(&qe_report)?;
+
+        if ti.mr_enclave.m != qe_report.body.mr_enclave.m
+        || ti.attributes.flags != qe_report.body.attributes.flags
+        || ti.attributes.xfrm != qe_report.body.attributes.xfrm
+        {
+            error!("qe_report does not match current target_info!");
+            return Err(SGXError(sgx_status_t::SGX_ERROR_UNEXPECTED));
+        }
+
+        self.defend_replay()?;
+
+        let (attn_report, sig, cert) = net.get_report(quote_buf).unwrap();
         return Ok(AttestationReport{
 
         })
     }
 
-    fn verify(report: &AttestationReport) -> bool {
+    // Check qe_report to defend against replay attack
+    // The purpose of p_qe_report is for the ISV enclave to confirm the QUOTE
+    // it received is not modified by the untrusted SW stack, and not a replay.
+    // The implementation in QE is to generate a REPORT targeting the ISV
+    // enclave (target info from p_report) , with the lower 32Bytes in
+    // report.data = SHA256(p_nonce||p_quote). The ISV enclave can verify the
+    // p_qe_report and report.data to confirm the QUOTE has not be modified and
+    // is not a replay. It is optional.
+    fn defend_replay(&quote_nonce: sgx_quote_nonce_t, &qe_report: sgx_report_t) -> Result<(), Error> {
+        let mut rhs_vec: Vec<u8> = quote_nonce.rand.to_vec();
+        rhs_vec.extend(&quote_buf);
+        let rhs_hash = rsgx_sha256_slice(&rhs_vec[..]).map_err(|e| {
+            error!("Sha256 error: {}", e);
+            return Err(Error::SGXError(e));
+        })?;
+
+        let lhs_hash = &qe_report.body.report_data.d[..32];
+
+        if rhs_hash != lhs_hash {
+            error!("Quote is tampered!");
+            return Err(Error::SGXError(sgx_status_t::SGX_ERROR_UNEXPECTED));
+        }
+        Ok(())
+    }
+
+    pub fn verify(report: &AttestationReport) -> bool {
         unimplemented!()
     }
 }

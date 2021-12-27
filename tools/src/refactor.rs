@@ -131,11 +131,11 @@ impl Net {
 }
 
 #[derive(Default)]
-struct OutCall {
+struct SgxCall {
 
 }
 
-impl OutCall {
+impl SgxCall {
     fn init_quote() -> Result<(sgx_target_info_t, sgx_epid_group_id_t), Error> {
         let mut rt: sgx_status_t = sgx_status_t::SGX_ERROR_UNEXPECTED;
         let mut ti: sgx_target_info_t = sgx_target_info_t::default();
@@ -239,8 +239,13 @@ fn as_u32_le(array: &[u8; 4]) -> u32 {
 }
 
 impl Attestation {
+    pub fn new() {
+        Self {
+
+        }
+    }
     // the funciton only executed in encalve.
-    pub fn create_report(&self, net: &Net, ocall: &OutCall, addition: &[u8], quote_type: sgx_quote_sign_type_t) -> Result<AttestationReport, Error> {
+    pub fn create_report(&self, net: &Net, ocall: &SgxCall, addition: &[u8], quote_type: sgx_quote_sign_type_t) -> Result<AttestationReport, Error> {
         // Workflow:
         // (1) ocall to get the target_info structure (ti) and epid group id (eg)
         // (1.5) get sigrl
@@ -314,11 +319,11 @@ impl Attestation {
 }
 
 // X. 509 certificate
-struct SelfCert {
+struct RaX509Cert {
     
 }
 
-impl SelfCert {
+impl RaX509Cert {
     pub fn generate(report: &AttestationReport) -> Vec<u8> {
         unimplemented!()
     }
@@ -328,6 +333,27 @@ impl SelfCert {
     }
 }
 
+pub fn gen_ecc_cert_with_sign_type(sign_type: sgx_quote_sign_type_t) -> Result<(Vec<u8>, Vec<u8>), Error> {
+    // Generate Keypair
+    let ecc_handle = SgxEccHandle::new();
+    let _result = ecc_handle.open();
+    let (prv_k, pub_k) = ecc_handle.create_key_pair().unwrap();
+
+    let ocall = SgxCall;
+    let net = Net::new();
+    let report = Attestation::new().create_report(&net, &ocall, sign_type)?;
+
+    let payload = attn_report + "|" + &sig + "|" + &cert;
+    let (key_der, cert_der) = match X509Cert::gen_ecc_cert(payload, &prv_k, &pub_k, &ecc_handle) {
+        Ok(r) => r,
+        Err(e) => {
+            error!("Error in gen_ecc_cert: {:?}", e);
+            return Err(e);
+        }
+    };
+    let _result = ecc_handle.close();
+    Ok((key_der, cert_der))
+}
 
 struct Utils {
     fn decode_spid() -> sgx_spid_t {
@@ -346,13 +372,13 @@ mod tests {
         let net = Net::new(spid, key);
 
         // init ocall
-        let ocall = OutCall::default();
+        let ocall = SgxCall::default();
 
 
         let report = Attestation::create_report(&net, &ocall).unwrap();
         assert!(Attestation::verify(&report));
 
-        let cert = SelfCert::generate(&report).unwrap()
-        assert!(SelfCert::verify(&cert));
+        let cert = RaX509Cert::generate(&report).unwrap()
+        assert!(RaX509Cert::verify(&cert));
     }
 }

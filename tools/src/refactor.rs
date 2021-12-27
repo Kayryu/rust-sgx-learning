@@ -30,7 +30,9 @@ extern "C" {
         ret_ti: *mut sgx_target_info_t,
         ret_gid: *mut sgx_epid_group_id_t,
     ) -> sgx_status_t;
+    
     pub fn ocall_get_ias_socket(ret_val: *mut sgx_status_t, ret_fd: *mut i32) -> sgx_status_t;
+
     pub fn ocall_get_quote(
         ret_val: *mut sgx_status_t,
         p_sigrl: *const u8,
@@ -59,8 +61,8 @@ pub const SIGRL_SUFFIX: &'static str = "/sgx/dev/attestation/v3/sigrl/";
 pub const REPORT_SUFFIX: &'static str = "/sgx/dev/attestation/v3/report";
 
 struct Net {
-    spid: sgx_spid_t,
-    key: String,
+    pub spid: sgx_spid_t,
+    pub key: String,
 }
 
 
@@ -131,11 +133,11 @@ impl Net {
 }
 
 #[derive(Default)]
-struct TrustCall {
+struct OutCall {
 
 }
 
-impl TrustCall {
+impl OutCall {
     fn init_quote() -> Result<(sgx_target_info_t, sgx_epid_group_id_t), Error> {
         let mut rt: sgx_status_t = sgx_status_t::SGX_ERROR_UNEXPECTED;
         let mut ti: sgx_target_info_t = sgx_target_info_t::default();
@@ -149,14 +151,12 @@ impl TrustCall {
             )
         };
 
-        debug!("eg = {:?}", eg);
-
         if res != sgx_status_t::SGX_SUCCESS {
-            return Err(ErrError(res));
+            return Err(Error::SGXError(res));
         }
 
         if rt != sgx_status_t::SGX_SUCCESS {
-            return Err(ErrError(rt));
+            return Err(Error::SGXError(rt));
         }
 
         return (ti, eg);
@@ -169,20 +169,70 @@ impl TrustCall {
         let res = unsafe { ocall_get_ias_socket(&mut rt as *mut sgx_status_t, &mut ias_sock as *mut i32) };
 
         if res != sgx_status_t::SGX_SUCCESS {
-            return Err(ErrError(res));
+            return Err(Error::SGXError(res));
         }
 
         if rt != sgx_status_t::SGX_SUCCESS {
-            return Err(ErrError(rt));
+            return Err(Error::SGXError(rt));
         }
     }
 
-    fn get_quote() -> Result<> {
+    fn get_quote(quote_type: sgx_quote_sign_type_t, sigrl:&[u8], report: &sgx_report_t, spid:&sgx_spid_t, quote_nonce: &sgx_quote_nonce_t) -> Result<(sgx_report_t, Vec<u8>, u32), Error> {
+        let mut rt: sgx_status_t = sgx_status_t::SGX_ERROR_UNEXPECTED;
+        
+        const RET_QUOTE_BUF_LEN: u32 = 2048;
+        let mut qe_report = sgx_report_t::default();
+        let mut quote_buf: Vec<u8> = Vec::with_capacity(RET_QUOTE_BUF_LEN);
+        let mut quote_len: u32 = 0;
 
+        let (p_sigrl, sigrl_len) = if sigrl_vec.len() == 0 {
+            (ptr::null(), 0)
+        } else {
+            (sigrl_vec.as_ptr(), sigrl_vec.len() as u32)
+        };
+        // (3) Generate the quote
+        // Args:
+        //       1. sigrl: ptr + len
+        //       2. report: ptr 432bytes
+        //       3. linkable: u32, unlinkable=0, linkable=1
+        //       4. spid: sgx_spid_t ptr 16bytes
+        //       5. sgx_quote_nonce_t ptr 16bytes
+        //       6. p_sig_rl + sigrl size ( same to sigrl)
+        //       7. [out]p_qe_report need further check
+        //       8. [out]p_quote
+        //       9. quote_size
+        let result = unsafe {
+            ocall_get_quote(
+                &mut rt as *mut sgx_status_t,
+                p_sigrl,
+                sigrl_len,
+                report as *const sgx_report_t,
+                quote_type,
+                spid as *const sgx_spid_t,
+                quote_nonce as *const sgx_quote_nonce_t,
+                &mut qe_report as *mut sgx_report_t,
+                quote_buf.as_mut_ptr(),
+                RET_QUOTE_BUF_LEN,
+                &mut quote_len as *mut u32,
+            )
+        };
+    
+        if result != sgx_status_t::SGX_SUCCESS {
+            error!("ocall_get_quote result={}", result);
+            return Err(Error::SGXError(result));
+        }
+    
+        if rt != sgx_status_t::SGX_SUCCESS {
+            error!("ocall_get_quote rt={}", rt);
+            return Err(Error::SGXError(rt));
+        }
+
+        return Ok(qe_report, quote_buf， quote_len);
     }
 }
 
 struct Attestation {
+    
 }
 
 fn as_u32_le(array: &[u8; 4]) -> u32 {
@@ -190,32 +240,38 @@ fn as_u32_le(array: &[u8; 4]) -> u32 {
 }
 
 impl Attestation {
-    fn create_report(net: &Net, ocall: &TrustCall, addition: &[u8]) -> Result<AttestationReport, Error> {
+    // the funciton only executed in encalve.
+    fn create_report(&self, net: &Net, ocall: &OutCall, addition: &[u8], quote_type: sgx_quote_sign_type_t) -> Result<AttestationReport, Error> {
         // Workflow:
         // (1) ocall to get the target_info structure (ti) and epid group id (eg)
         // (1.5) get sigrl
         // (2) call sgx_create_report with ti+data, produce an sgx_report_t
         // (3) ocall to sgx_get_quote to generate (*mut sgx-quote_t, uint32_t)
 
-        let (mut ti, mut eg) = ocall.init_quote().unwrap();
+        let (ti, eg) = ocall.init_quote()?;
 
         let gid: u32 = as_u32_le(&eg);
+        let sigrl: Vec<u8> = net.get_sigrl(gid)?;
 
-        let sigrl_vec: Vec<u8> = net.get_sigrl(gid).unwrap();
-
-        let mut report_data: sgx_report_data_t = sgx_report_data_t::default();
         // Fill data into report_data
+        let mut report_data: sgx_report_data_t = sgx_report_data_t::default();
         report_data.d[..addition.len()].clone_from_slice(addition);
-        let rep = match rsgx_create_report(&ti, &report_data) {
-            Ok(r) => {
-                debug!("Report creation => success {:?}", r.body.mr_signer.m);
-                Some(r)
-            }
-            Err(e) => {
-                error!("Report creation => failed {:?}", e);
-                return Err(Error::);
-            }
-        };
+        let report = match rsgx_create_report(&ti, &report_data).map_err(|e| {
+            error!("Report creation => failed {:?}", e);
+            return Err(Error::SGXError(e));
+        })?;
+
+        // generate rand
+        let mut quote_nonce = sgx_quote_nonce_t { rand: [0; 16] };
+        let mut os_rng = rand::thread_rng();
+        os_rng.fill_bytes(&mut quote_nonce.rand);
+        let (qe_report, quote_buf, quote_len) = ocall.get_quote(quote_type, &sigrl, &report, &net.spid, &quote_nonce)?;
+
+        let quote: Vec<u8> = quote_buf[..quote_len as usize].to_vec();
+        let (attn_report, sig, cert) = net.get_report(quote).unwrap();
+        return Ok(AttestationReport{
+
+        })
     }
 
     fn verify(report: &AttestationReport) -> bool {
@@ -256,7 +312,7 @@ mod tests {
         let net = Net::new(spid, key);
 
         // init ocall
-        let ocall = TrustCall::default();
+        let ocall = OutCall::default();
 
 
         let report = Attestation::create_report(&net, &ocall).unwrap();

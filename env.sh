@@ -16,7 +16,7 @@ if [ -z "$id" ]; then
     if [ "$1" == "SM" ]; then
         docker run -v $ep:/root/sgx-learning --name $name -it baiduxlab/sgx-rust
     else
-        docker run -v $ep:/root/sgx-learning --name $name --device /dev/sgx/enclave --device /dev/sgx/provision -it baiduxlab/sgx-rust
+        docker run -v $ep:/root/sgx-learning --name $name --device /dev/sgx/enclave --device /dev/sgx/provision --net=host -it baiduxlab/sgx-rust
     fi
 else
     docker start $name

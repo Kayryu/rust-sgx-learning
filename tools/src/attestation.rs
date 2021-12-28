@@ -223,8 +223,8 @@ impl Attestation {
     pub fn verify(report: &AttestationReport, pub_k: sgx_ec256_public_t) -> Result<ReportData, Error> {
         let attn_report_raw = report.ra_report;
         // Verify attestation report
-        // 1. Check timestamp is within 24H
-        let attn_report: Value = serde_json::from_slice(&attn_report_raw).unwrap();
+        let attn_report: Value = serde_json::from_slice(&attn_report_raw).map_err(|_| Error::InvalidReport)?;
+
         if let Value::String(time) = &attn_report["timestamp"] {
             let time_fixed = time.clone() + "+0000";
             let ts = DateTime::parse_from_str(&time_fixed, "%Y-%m-%dT%H:%M:%S%.f%z")
@@ -299,3 +299,4 @@ impl Attestation {
         return Ok(());
     }
 }
+

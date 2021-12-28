@@ -1,9 +1,9 @@
 use crate::error::Error;
 
 pub struct AttestationReport {
-    ra_report: Vec<u8>,
-    signature: Vec<u8>,
-    cert_raw: Vec<u8>,
+    pub ra_report: Vec<u8>,
+    pub signature: Vec<u8>,
+    pub cert_raw: Vec<u8>,
 }
 
 impl AttestationReport {
@@ -20,7 +20,7 @@ impl AttestationReport {
     }
 
     pub fn from_payload(payload: &[u8]) -> Result<Self, Error> {
-        let mut iter = payload.split(|x| *x == 0x7C);
+        let mut iter = payload.split(|x| *x == 0x7Cu8);
         let attn_report_raw = iter.next().unwrap();
         let sig_raw = iter.next().unwrap();
         let sig_cert_raw = iter.next().unwrap();
@@ -28,7 +28,7 @@ impl AttestationReport {
             ra_report: attn_report_raw.to_vec(),
             signature: sig_raw.to_vec(),
             cert_raw: sig_cert_raw.to_vec(),
-        })
+        });
     }
 }
 
@@ -41,6 +41,6 @@ mod tests {
 
     #[test]
     fn test_report_to_payload() {
-
+        
     }
 }

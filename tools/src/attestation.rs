@@ -1,13 +1,22 @@
 use std::prelude::v1::*;
+use std::ptr;
 use chrono::DateTime;
 use serde_json::Value;
 use itertools::Itertools;
+use log::{info, debug, error};
+use std::time::{SystemTime, UNIX_EPOCH};
+use rand::RngCore as _;
+use std::untrusted::time::SystemTimeEx;
+use std::io::BufReader;
 
 use sgx_types::*;
+use sgx_tse::{rsgx_verify_report, rsgx_create_report};
+use sgx_tcrypto::rsgx_sha256_slice;
 
-use crate::types::AttestationReport;
+use crate::traits::AttestationReportVerifier;
+use crate::types::{AttestationReport, ReportData};
 use crate::error::Error;
-use crate::net::Net;
+use crate::ias::Net;
 
 extern "C" {
     pub fn ocall_sgx_init_quote(
@@ -61,7 +70,7 @@ impl SgxCall {
         return Ok((ti, eg));
     }
 
-    fn ias_socket() -> Result<i32, Error> {
+    fn get_ias_socket() -> Result<i32, Error> {
         let mut rt: sgx_status_t = sgx_status_t::SGX_ERROR_UNEXPECTED;
         let mut ias_sock: i32 = 0;
 
@@ -94,7 +103,7 @@ impl SgxCall {
         let (p_sigrl, sigrl_len) = if sigrl.len() == 0 {
             (ptr::null(), 0)
         } else {
-            (sigrl_vec.as_ptr(), sigrl.len() as u32)
+            (sigrl.as_ptr(), sigrl.len() as u32)
         };
         // (3) Generate the quote
         // Args:
@@ -145,7 +154,6 @@ impl Attestation {
     // the funciton only executed in encalve.
     pub fn create_report(
         net: &Net,
-        ocall: &SgxCall,
         addition: &[u8],
         quote_type: sgx_quote_sign_type_t,
     ) -> Result<AttestationReport, Error> {
@@ -154,26 +162,27 @@ impl Attestation {
         // (1.5) get sigrl
         // (2) call sgx_create_report with ti+data, produce an sgx_report_t
         // (3) ocall to sgx_get_quote to generate (*mut sgx-quote_t, uint32_t)
-        let (ti, eg) = ocall::init_quote()?;
+        let (ti, eg) = SgxCall::init_quote()?;
 
         let gid: u32 = u32::from_le_bytes(eg);
-        let sigrl: Vec<u8> = net.get_sigrl(gid)?;
+        let fd = SgxCall::get_ias_socket()?;
+        let sigrl: Vec<u8> = net.get_sigrl(fd, gid)?;
 
         // Fill data into report_data
         let mut report_data: sgx_report_data_t = sgx_report_data_t::default();
         report_data.d[..addition.len()].clone_from_slice(addition);
         let report = rsgx_create_report(&ti, &report_data).map_err(|e| {
             error!("Report creation failed {}", e);
-            return Err(Error::SGXError(e));
+            return Error::SGXError(e);
         })?;
 
         // generate rand
         let mut quote_nonce = sgx_quote_nonce_t { rand: [0; 16] };
         let mut os_rng = rand::thread_rng();
         os_rng.fill_bytes(&mut quote_nonce.rand);
-        let (qe_report, quote_buf) = ocall::get_quote(quote_type, &sigrl, &report, &net.spid, &quote_nonce)?;
+        let (qe_report, quote_buf) = SgxCall::get_quote(quote_type, &sigrl, &report, &net.spid, &quote_nonce)?;
 
-        rsgx_verify_report(&qe_report)?;
+        rsgx_verify_report(&qe_report).map_err(|e| Error::SGXError(e))?;
 
         if ti.mr_enclave.m != qe_report.body.mr_enclave.m
             || ti.attributes.flags != qe_report.body.attributes.flags
@@ -183,10 +192,11 @@ impl Attestation {
             return Err(Error::SGXError(sgx_status_t::SGX_ERROR_UNEXPECTED));
         }
 
-        Self::defend_replay(&quote_nonce, &qe_report)?;
+        Self::defend_replay(&quote_nonce, &quote_buf, &qe_report)?;
 
-        let report = net.get_report(quote_buf)?;
-        return report;
+        let fd = SgxCall::get_ias_socket()?;
+        let report = net.get_report(fd, quote_buf)?;
+        return Ok(report);
     }
 
     // Check qe_report to defend against replay attack
@@ -197,12 +207,12 @@ impl Attestation {
     // report.data = SHA256(p_nonce||p_quote). The ISV enclave can verify the
     // p_qe_report and report.data to confirm the QUOTE has not be modified and
     // is not a replay. It is optional.
-    fn defend_replay(quote_nonce: &sgx_quote_nonce_t, qe_report: &sgx_report_t) -> Result<(), Error> {
+    fn defend_replay(quote_nonce: &sgx_quote_nonce_t, quote_buf:&[u8], qe_report: &sgx_report_t) -> Result<(), Error> {
         let mut rhs_vec: Vec<u8> = quote_nonce.rand.to_vec();
-        rhs_vec.extend(&quote_buf);
+        rhs_vec.extend(quote_buf);
         let rhs_hash = rsgx_sha256_slice(&rhs_vec[..]).map_err(|e| {
             error!("Sha256 error: {}", e);
-            return Err(Error::SGXError(e));
+            return Error::SGXError(e);
         })?;
 
         let lhs_hash = &qe_report.body.report_data.d[..32];
@@ -214,7 +224,7 @@ impl Attestation {
         Ok(())
     }
 
-    pub fn verify(report: &AttestationReport, pub_k: sgx_ec256_public_t) -> Result<ReportData, Error> {
+    pub fn verify(report: &AttestationReport, pub_k: &[u8]) -> Result<ReportData, Error> {
         let attn_report_raw = report.ra_report;
         // Verify attestation report
         let attn_report: Value = serde_json::from_slice(&attn_report_raw).map_err(|_| Error::InvalidReport)?;
@@ -228,7 +238,7 @@ impl Attestation {
             println!("Time diff = {}", now - ts);
         } else {
             println!("Failed to fetch timestamp from attestation report");
-            return Err(sgx_status_t::SGX_ERROR_UNEXPECTED);
+            return Err(Error::SGXError(sgx_status_t::SGX_ERROR_UNEXPECTED));
         }
 
         // 2. Verify quote status (mandatory field)
@@ -239,18 +249,18 @@ impl Attestation {
                 "GROUP_OUT_OF_DATE" | "GROUP_REVOKED" | "CONFIGURATION_NEEDED" => {
                     // Verify platformInfoBlob for further info if status not OK
                     if let Value::String(pib) = &attn_report["platformInfoBlob"] {
-                        let got_pib = platform_info::from_str(&pib);
-                        println!("{:?}", got_pib);
+                        // let got_pib = platform_info::from_str(&pib);
+                        // println!("{:?}", got_pib);
                     } else {
                         println!("Failed to fetch platformInfoBlob from attestation report");
-                        return Err(sgx_status_t::SGX_ERROR_UNEXPECTED);
+                        return Err(Error::SGXError(sgx_status_t::SGX_ERROR_UNEXPECTED));
                     }
                 }
-                _ => return Err(sgx_status_t::SGX_ERROR_UNEXPECTED),
+                _ => return Err(Error::SGXError(sgx_status_t::SGX_ERROR_UNEXPECTED)),
             }
         } else {
             println!("Failed to fetch isvEnclaveQuoteStatus from attestation report");
-            return Err(sgx_status_t::SGX_ERROR_UNEXPECTED);
+            return Err(Error::SGXError(sgx_status_t::SGX_ERROR_UNEXPECTED));
         }
 
         // 3. Verify quote body
@@ -281,16 +291,23 @@ impl Attestation {
                     sgx_quote.report_body.mr_signer.m.iter().format("")
                 );
             }
+
             println!("Anticipated public key = {:02x}", pub_k.iter().format(""));
             if sgx_quote.report_body.report_data.d.to_vec() == pub_k.to_vec() {
                 println!("ue RA done!");
             }
         } else {
             println!("Failed to fetch isvEnclaveQuoteBody from attestation report");
-            return Err(sgx_status_t::SGX_ERROR_UNEXPECTED);
+            return Err(Error::SGXError(sgx_status_t::SGX_ERROR_UNEXPECTED));
         }
 
-        return Ok(());
+        return Ok(ReportData::default());
+    }
+}
+
+impl AttestationReportVerifier for Attestation {
+    fn verify(report: &AttestationReport, pub_k: &[u8]) -> Result<ReportData, Error> {
+        Attestation::verify(report, pub_k)
     }
 }
 

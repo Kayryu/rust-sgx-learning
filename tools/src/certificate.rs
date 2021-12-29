@@ -29,7 +29,7 @@ const ISSUER: &str = "SafeMatrix";
 const SUBJECT: &str = "SafeMatrix";
 
 // TODO into bytes
-pub const IAS_REPORT_CA: &[u8] = include_bytes!("./AttestationReportSigningCACert.pem");
+pub const IAS_REPORT_CA: &[u8] = include_bytes!("../res/AttestationReportSigningCACert.pem");
 
 type SignatureAlgorithms = &'static [&'static webpki::SignatureAlgorithm];
 static SUPPORTED_SIG_ALGS: SignatureAlgorithms = &[
@@ -202,7 +202,7 @@ where
     #[cfg(not(feature = "sgx"))]
     pub fn verify(cert: &[u8], now: u64) -> Result<ReportData, Error> {
         // Before we reach here, Webpki already verifed the cert is properly signed
-        let payload = Self::extract_payload(&cert)?;
+        let (payload, pub_k) = Self::extract_data(&cert)?;
         // Extract each field
         let report = AttestationReport::from_payload(&payload)?;
 
@@ -250,7 +250,7 @@ where
         return Ok(report_data);
     }
 
-    pub(crate) fn extract_payload(cert_der: &[u8]) -> Result<Vec<u8>, Error> {
+    pub(crate) fn extract_data(cert_der: &[u8]) -> Result<(Vec<u8>, Vec<u8>), Error> {
         // Search for Public Key prime256v1 OID
         let prime256v1_oid = &[0x06, 0x08, 0x2A, 0x86, 0x48, 0xCE, 0x3D, 0x03, 0x01, 0x07];
         let mut offset = cert_der
@@ -289,7 +289,7 @@ where
         offset += 1;
         let payload = cert_der[offset..offset + len].to_vec();
 
-        return Ok(payload);
+        return Ok((payload, pub_k));
     }
 }
 

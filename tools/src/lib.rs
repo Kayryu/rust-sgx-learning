@@ -1,20 +1,21 @@
-#![no_std]
+#![cfg_attr(not(feature = "std"), no_std)]
 
-#[cfg(not(target_env = "sgx"))]
+#[cfg(feature = "sgx")]
 #[macro_use]
 extern crate sgx_tstd as std;
 
-mod cert;
+mod certificate;
 mod error;
-// mod attestation;
-mod net;
+mod attestation;
+mod ias;
 mod traits;
 mod types;
 
-pub use cert::RaX509Cert;
+pub use certificate::RaX509Cert;
 pub use error::Error;
 pub use traits::AttestationReportVerifier;
 pub use types::*;
+pub use ias::Net;
 
 use std::prelude::v1::*;
 
@@ -42,6 +43,7 @@ cargo.toml
 use sgx_types::*;
 use std::char;
 use std::prelude::v1::*;
+
 
 // use crate::attestation::Attestation;
 // use crate::attestation::SgxCall;

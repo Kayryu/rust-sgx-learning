@@ -8,11 +8,16 @@ use sgx_types::*;
 
 use bit_vec::BitVec;
 use chrono::Duration;
+use chrono::TimeZone;
 use chrono::Utc as TzUtc;
 use num_bigint::BigUint;
 
 #[cfg(feature = "sgx")]
 use yasna::models::ObjectIdentifier;
+#[cfg(feature = "sgx")]
+use sgx_tcrypto::SgxEccHandle;
+#[cfg(feature = "sgx")]
+use crate::std::untrusted::time::SystemTimeEx;
 
 use crate::error::Error;
 use crate::traits::AttestationReportVerifier;
@@ -135,7 +140,7 @@ where
                                 writer
                                     .next()
                                     .write_oid(&ObjectIdentifier::from_slice(&[2, 16, 840, 1, 113730, 1, 13]));
-                                writer.next().write_bytes(&payload.into_payload());
+                                writer.next().write_bytes(&payload.clone().into_payload());
                             });
                         });
                     });
@@ -194,6 +199,7 @@ where
         (key_der, cert_der)
     }
 
+    #[cfg(not(feature = "sgx"))]
     pub fn verify(cert: &[u8], now: u64) -> Result<ReportData, Error> {
         // Before we reach here, Webpki already verifed the cert is properly signed
         let payload = Self::extract_payload(&cert)?;

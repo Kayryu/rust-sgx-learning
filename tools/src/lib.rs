@@ -1,7 +1,13 @@
+#![no_std]
+
+#[cfg(not(target_env = "sgx"))]
+#[macro_use]
+extern crate sgx_tstd as std;
+
 mod cert;
 mod error;
 // mod attestation;
-// mod net;
+mod net;
 mod traits;
 mod types;
 
@@ -9,6 +15,8 @@ pub use cert::RaX509Cert;
 pub use error::Error;
 pub use traits::AttestationReportVerifier;
 pub use types::*;
+
+use std::prelude::v1::*;
 
 /*
 目标，该库既能在sgx中编译，同时也能在native和wasm编译。

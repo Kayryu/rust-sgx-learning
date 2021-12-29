@@ -1,4 +1,5 @@
 use sgx_types::sgx_status_t;
+use std::prelude::v1::*;
 
 #[derive(Debug, Eq, PartialEq)]
 pub enum Error {

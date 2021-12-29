@@ -1,13 +1,13 @@
-use crate::error::Error;
 use std::prelude::v1::*;
 use chrono::DateTime;
 use serde_json::Value;
 use itertools::Itertools;
 
-use crate::types::AttestationReport;
-
 use sgx_types::*;
 
+use crate::types::AttestationReport;
+use crate::error::Error;
+use crate::net::Net;
 
 extern "C" {
     pub fn ocall_sgx_init_quote(

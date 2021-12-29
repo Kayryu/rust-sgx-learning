@@ -1,7 +1,9 @@
+use std::prelude::v1::*;
 use crate::error::Error;
 
 const SEPARATOR: u8 = 0x7Cu8;
 
+#[derive(Clone)]
 pub struct AttestationReport {
     pub ra_report: Vec<u8>,
     pub signature: Vec<u8>,
@@ -42,5 +44,5 @@ mod tests {
     use serde_json::*;
 
     #[test]
-    fn test_report_to_payload() {}
+    fn test_report_into_payload() {}
 }

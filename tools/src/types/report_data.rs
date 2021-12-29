@@ -1,5 +1,7 @@
 // from https://www.intel.com/content/dam/develop/public/us/en/documents/sgx-attestation-api-spec.pdf
 
+use std::prelude::v1::*;
+
 #[derive(Default, Debug, Eq, PartialEq)]
 pub struct ReportData {
     /// Representation of unique identifier of the Attestation Verification Report.

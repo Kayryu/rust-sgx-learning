@@ -2,15 +2,14 @@ use std::io::Read;
 use std::io::Write;
 use std::net::TcpStream;
 use std::sync::Arc;
+use std::str;
+use std::prelude::v1::*;
+use sgx_types::*;
+use log::{info, debug, error};
+
 use crate::error::Error;
-use crate::attestation::Attestation;
 use crate::types::AttestationReport;
 use crate::Utils;
-use crate::attestation::SgxCall;
-
-use sgx_types::sgx_spid_t;
-
-use std::prelude::v1::*;
 
 pub const DEV_HOSTNAME: &'static str = "api.trustedservices.intel.com";
 pub const SIGRL_SUFFIX: &'static str = "/sgx/dev/attestation/v3/sigrl/";
@@ -25,23 +24,23 @@ pub struct Net {
 
 impl Net {
     pub fn new(spid: String, ias_key: String) -> Self {
-        let spid = Utils::decode_spid(spid);
+        let spid = Utils::decode_spid(&spid);
         Self { spid, ias_key }
     }
 
-    pub fn get_sigrl(&self, gid: u32) -> Result<Vec<u8>, Error> {
+    pub fn get_sigrl(&self, fd: c_int, gid: u32) -> Result<Vec<u8>, Error> {
         let request = format!(
             "GET {}{:08x} HTTP/1.1\r\nHOST: {}\r\nOcp-Apim-Subscription-Key: {}\r\nConnection: Close\r\n\r\n",
             SIGRL_SUFFIX, gid, DEV_HOSTNAME, self.ias_key
         );
 
-        let resp = self.send(request)?;
+        let resp = self.send(fd, request)?;
 
         // parse http response
         return Ok(Self::parse_response_sigrl(&resp.as_bytes()));
     }
 
-    pub fn get_report(&self, quote: Vec<u8>) -> Result<AttestationReport, Error> {
+    pub fn get_report(&self, fd: c_int, quote: Vec<u8>) -> Result<AttestationReport, Error> {
         let encoded_quote = base64::encode(&quote[..]);
         let encoded_json = format!("{{\"isvEnclaveQuote\":\"{}\"}}\r\n", encoded_quote);
 
@@ -52,7 +51,7 @@ impl Net {
                             encoded_json.len(),
                             encoded_json);
 
-        let resp = self.send(request)?;
+        let resp = self.send(fd, request)?;
 
         // parse http response
         let (att_report, sig, sig_cert) = Self::parse_response_attn_report(&resp.as_bytes());
@@ -64,9 +63,7 @@ impl Net {
         });
     }
 
-    fn send(&self, request: String) -> Result<String, Error> {
-
-        let fd = 
+    fn send(&self, fd: c_int, request: String) -> Result<String, Error> {
         let config = Self::make_ias_client_config();
         let dns_name = webpki::DNSNameRef::try_from_ascii_str(DEV_HOSTNAME).unwrap();
         let mut sess = rustls::ClientSession::new(&Arc::new(config), dns_name);
@@ -143,7 +140,7 @@ impl Net {
 
         // Remove %0A from cert, and only obtain the signing cert
         cert = cert.replace("%0A", "");
-        cert = cert::percent_decode(cert);
+        cert = Self::percent_decode(cert);
         let v: Vec<&str> = cert.split("-----").collect();
         let sig_cert = v[2].to_string();
 
@@ -156,6 +153,19 @@ impl Net {
 
         // len_num == 0
         (attn_report, sig, sig_cert)
+    }
+
+    fn percent_decode(orig: String) -> String {
+        let v: Vec<&str> = orig.split("%").collect();
+        let mut ret = String::new();
+        ret.push_str(v[0]);
+        if v.len() > 1 {
+            for s in v[1..].iter() {
+                ret.push(u8::from_str_radix(&s[0..2], 16).unwrap() as char);
+                ret.push_str(&s[2..]);
+            }
+        }
+        ret
     }
 
     fn parse_response_sigrl(resp: &[u8]) -> Vec<u8> {

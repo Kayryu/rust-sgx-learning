@@ -17,6 +17,7 @@ pub use traits::AttestationReportVerifier;
 pub use types::*;
 pub use ias::Net;
 pub use attestation::Attestation;
+pub use sgx_types::sgx_quote_sign_type_t;
 
 use std::prelude::v1::*;
 
@@ -40,7 +41,7 @@ cargo.toml
 
 */
 
-use sgx_tcrypto::SgxEccHandle;
+use sgx_tcrypto::*;
 use sgx_types::*;
 use std::char;
 
@@ -121,11 +122,20 @@ impl Utils {
 
 #[cfg(test)]
 mod tests {
+    const c_prv_k: [u8;32] = [44, 227, 141, 100, 114, 207, 218, 155, 139, 188, 37, 197, 185, 21, 193, 87, 88, 54, 231, 73, 151, 162, 195, 83, 151, 147, 6, 48, 26, 47, 10, 226];
+    const c_pub_k_gx: [u8;32] = [74, 145, 120, 205, 221, 0, 154, 144, 163, 82, 192, 196, 1, 15, 118, 75, 209, 154, 237, 169, 167, 41, 150, 215, 244, 154, 243, 39, 50, 184, 78, 148];
+    const c_pub_k_gy: [u8;32] = [146, 163, 127, 120, 250, 35, 208, 197, 56, 239, 187, 69, 194, 96, 236, 87, 96, 201, 19, 37, 24, 126, 229, 213, 59, 96, 112, 4, 165, 220, 160, 51];
+
+
     #[test]
     fn example() {
         // load files
         let spid: String = "22aa549a2d5e47a2933a753c1cae947c".to_string();
         let key: String = "22aa549a2d5e47a2933a753c1cae947c".to_string();
+        
+        let prv_k: sgx_ec256_private_t = sgx_ec256_private_t {r: c_prv_k.clone()};
+        let pub_k: sgx_ec256_public_t = sgx_ec256_public_t { gx: c_pub_k_gx.clone(), gy: c_pub_k_gy.clone()};
+    
         // init net
         // let net = Net::new(spid, key);
 

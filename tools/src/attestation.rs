@@ -97,7 +97,7 @@ impl SgxCall {
 
         const RET_QUOTE_BUF_LEN: u32 = 2048;
         let mut qe_report = sgx_report_t::default();
-        let mut quote_buf: Vec<u8> = Vec::with_capacity(RET_QUOTE_BUF_LEN as usize);
+        let mut quote_buf: [u8; RET_QUOTE_BUF_LEN as usize] = [0; RET_QUOTE_BUF_LEN as usize];
         let mut quote_len: u32 = 0;
 
         let (p_sigrl, sigrl_len) = if sigrl.len() == 0 {
@@ -140,8 +140,9 @@ impl SgxCall {
             return Err(Error::SGXError(rt));
         }
 
-        quote_buf.truncate(quote_len as usize);
-        return Ok((qe_report, quote_buf));
+        let mut quote = quote_buf.to_vec();
+        quote.truncate(quote_len as usize);
+        return Ok((qe_report, quote));
     }
 }
 
@@ -149,6 +150,7 @@ impl SgxCall {
 pub struct Attestation {}
 
 impl Attestation {
+    // TODO, with rand
     // the funciton only executed in encalve.
     pub fn create_report(
         net: &Net,
@@ -174,7 +176,7 @@ impl Attestation {
             return Error::SGXError(e);
         })?;
 
-        // generate rand
+        // generate rand. WIP: Even if the public key and random number are fixed, their quote is still different.
         let mut quote_nonce = sgx_quote_nonce_t { rand: [0; 16] };
         let mut os_rng = rand::thread_rng();
         os_rng.fill_bytes(&mut quote_nonce.rand);

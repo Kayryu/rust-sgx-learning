@@ -214,6 +214,9 @@ impl Attestation {
         })?;
 
         let lhs_hash = &qe_report.body.report_data.d[..32];
+        
+        debug!("rhs hash = {:02X}", rhs_hash.iter().format(""));
+        debug!("report hs= {:02X}", lhs_hash.iter().format(""));
 
         if rhs_hash != lhs_hash {
             error!("Quote is tampered!");

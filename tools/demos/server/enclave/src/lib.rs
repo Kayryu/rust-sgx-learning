@@ -23,8 +23,8 @@ use tra::{gen_ecc_cert_with_sign_type};
 pub extern "C" fn run_ra_web_server() -> sgx_status_t {
     env_logger::init();
 
-    let spid: String = "22aa549a2d5e47a2933a753c1cae947c".to_owned();
-    let key: String = "B6E792288644E2957A40AF226F5E4DD8".to_owned();
+    let spid: String = "B6E792288644E2957A40AF226F5E4DD8".to_owned();
+    let key: String = "22aa549a2d5e47a2933a753c1cae947c".to_owned();
     let sign_type = sgx_quote_sign_type_t::SGX_LINKABLE_SIGNATURE;
 
     // generate cert by remote attestation.

@@ -17,7 +17,7 @@ use std::borrow::ToOwned;
 use std::string::String;
 
 use log::{info, debug, error};
-use tra::{Attestation, SgxCall, Net, RaX509Cert};
+use tra::{gen_ecc_cert_with_sign_type};
 
 #[no_mangle]
 pub extern "C" fn run_ra_web_server() -> sgx_status_t {
@@ -28,14 +28,7 @@ pub extern "C" fn run_ra_web_server() -> sgx_status_t {
     let key: String = "B6E792288644E2957A40AF226F5E4DD8".to_owned();
 
     // generate cert by remote attestation.
-    let ecc_handle = SgxEccHandle::new();
-    let result = ecc_handle.open();
-    let (prv_k, pub_k) = ecc_handle.create_key_pair().unwrap();
-    let ocall = SgxCall {};
-    let net = Net::new(spid, key);
-    let report = Attestation::create_report(&net, &ocall, sign_type).unwrap();
-    let (key_der, cert_der) = RaX509Cert::generate(&report, &prv_k, &pub_k, &ecc_handle);
-    result.close();
+    let (key_der, cert_der) = gen_ecc_cert_with_sign_type(spid, key, sign_type).unwrap();
 
     let mut cfg = rustls::ServerConfig::new(rustls::NoClientAuth::new());
     let mut certs = Vec::new();

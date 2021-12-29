@@ -11,7 +11,7 @@ crate-type = ["staticlib"]
 [features]
 default = ["sgx"]
 sgx = [
-    # "tra/sgx"
+    "tra/sgx"
 ]
 
 [dependencies]

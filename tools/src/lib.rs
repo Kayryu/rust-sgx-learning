@@ -1,4 +1,5 @@
-#![cfg_attr(not(feature = "std"), no_std)]
+// #![cfg_attr(not(feature = "std"), no_std)]
+#![no_std]
 
 #[cfg(feature = "sgx")]
 #[macro_use]
@@ -6,8 +7,8 @@ extern crate sgx_tstd as std;
 
 mod certificate;
 mod error;
-mod attestation;
-mod ias;
+// mod attestation;
+// mod ias;
 mod traits;
 mod types;
 
@@ -15,7 +16,7 @@ pub use certificate::RaX509Cert;
 pub use error::Error;
 pub use traits::AttestationReportVerifier;
 pub use types::*;
-pub use ias::Net;
+// pub use ias::Net;
 
 use std::prelude::v1::*;
 
@@ -39,36 +40,26 @@ cargo.toml
 
 */
 
-// use sgx_tcrypto::SgxEccHandle;
+use sgx_tcrypto::SgxEccHandle;
 use sgx_types::*;
 use std::char;
-use std::prelude::v1::*;
 
 
-// use crate::attestation::Attestation;
-// use crate::attestation::SgxCall;
-// use crate::net::Net;
-// use crate::cert::RaX509Cert;
-// use crate::error::Error;
+pub fn gen_ecc_cert_with_sign_type(spid: String, ias_key: String, sign_type: sgx_quote_sign_type_t) -> Result<(Vec<u8>, Vec<u8>), Error> {
+    // Generate Keypair
+    // let ecc_handle = SgxEccHandle::new();
+    // let _result = ecc_handle.open();
+    // let (prv_k, pub_k) = ecc_handle.create_key_pair().unwrap();
 
-// pub fn gen_ecc_cert_with_sign_type(sign_type: sgx_quote_sign_type_t) -> Result<(Vec<u8>, Vec<u8>), Error> {
-//     // Generate Keypair
-//     let ecc_handle = SgxEccHandle::new();
-//     let _result = ecc_handle.open();
-//     let (prv_k, pub_k) = ecc_handle.create_key_pair().unwrap();
+    // let ocall = SgxCall {};
+    // let net = Net::new(spid, ias_key);
+    // let report = Attestation::create_report(&net, &ocall, sign_type)?;
 
-//     // load files
-//     let spid: String = "22aa549a2d5e47a2933a753c1cae947c".to_string();
-//     let key: String = "22aa549a2d5e47a2933a753c1cae947c".to_string();
-
-//     let ocall = SgxCall {};
-//     let net = Net::new(spid, key);
-//     let report = Attestation::create_report(&net, &ocall, sign_type)?;
-
-//     let (key_der, cert_der) = RaX509Cert::generate(&report, &prv_k, &pub_k, &ecc_handle);
-//     let _result = ecc_handle.close();
-//     Ok((key_der, cert_der))
-// }
+    // let (key_der, cert_der) = RaX509Cert::generate(&report, &prv_k, &pub_k, &ecc_handle);
+    // let _result = ecc_handle.close();
+    // Ok((key_der, cert_der))
+    Ok((Vec::new(), Vec::new()))
+}
 
 pub struct Utils {}
 

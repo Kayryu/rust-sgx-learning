@@ -22,7 +22,7 @@ use crate::std::untrusted::time::SystemTimeEx;
 use crate::error::Error;
 use crate::traits::AttestationReportVerifier;
 use crate::types::AttestationReport;
-use crate::types::ReportData;
+// use crate::types::ReportData;
 
 pub const CERTEXPIRYDAYS: i64 = 90i64;
 const ISSUER: &str = "SafeMatrix";

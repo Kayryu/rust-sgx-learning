@@ -1,6 +1,6 @@
 use crate::error::Error;
 
-const SEPARATOR:u8 = 0x7Cu8;
+const SEPARATOR: u8 = 0x7Cu8;
 
 pub struct AttestationReport {
     pub ra_report: Vec<u8>,

@@ -6,9 +6,9 @@ mod traits;
 mod types;
 
 pub use cert::RaX509Cert;
+pub use error::Error;
 pub use traits::AttestationReportVerifier;
 pub use types::*;
-pub use error::Error;
 
 /*
 目标，该库既能在sgx中编译，同时也能在native和wasm编译。

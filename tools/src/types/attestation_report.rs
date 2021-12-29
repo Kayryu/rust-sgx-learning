@@ -1,5 +1,7 @@
 use crate::error::Error;
 
+const SEPARATOR:u8 = 0x7Cu8;
+
 pub struct AttestationReport {
     pub ra_report: Vec<u8>,
     pub signature: Vec<u8>,
@@ -9,7 +11,7 @@ pub struct AttestationReport {
 impl AttestationReport {
     // use for transfer to payload of cert
     pub fn into_payload(self) -> Vec<u8> {
-        const separator: &[u8] = &[0x7Cu8];
+        let separator: &[u8] = &[SEPARATOR];
         let mut payload = Vec::new();
         payload.extend(self.ra_report);
         payload.extend(separator);
@@ -20,7 +22,7 @@ impl AttestationReport {
     }
 
     pub fn from_payload(payload: &[u8]) -> Result<Self, Error> {
-        let mut iter = payload.split(|x| *x == 0x7Cu8);
+        let mut iter = payload.split(|x| *x == SEPARATOR);
         let attn_report_raw = iter.next().unwrap();
         let sig_raw = iter.next().unwrap();
         let sig_cert_raw = iter.next().unwrap();

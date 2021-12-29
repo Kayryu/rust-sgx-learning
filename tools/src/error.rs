@@ -9,5 +9,4 @@ pub enum Error {
     InvalidIASSigningCert,
     InvalidReport,
     InvalidReportPayload,
-    CertTimeOut,
 }

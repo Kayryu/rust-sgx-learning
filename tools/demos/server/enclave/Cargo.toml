@@ -1,7 +1,6 @@
 [package]
 name = "raserver"
 version = "1.0.0"
-authors = ["The Teaclave Authors"]
 edition = "2018"
 
 [lib]

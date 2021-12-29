@@ -1,5 +1,4 @@
-// #![cfg_attr(not(feature = "std"), no_std)]
-#![no_std]
+#![cfg_attr(not(feature = "std"), no_std)]
 
 #[cfg(feature = "sgx")]
 #[macro_use]
@@ -7,8 +6,8 @@ extern crate sgx_tstd as std;
 
 mod certificate;
 mod error;
-// mod attestation;
-// mod ias;
+mod attestation;
+mod ias;
 mod traits;
 mod types;
 
@@ -16,7 +15,8 @@ pub use certificate::RaX509Cert;
 pub use error::Error;
 pub use traits::AttestationReportVerifier;
 pub use types::*;
-// pub use ias::Net;
+pub use ias::Net;
+pub use attestation::Attestation;
 
 use std::prelude::v1::*;
 
@@ -47,18 +47,27 @@ use std::char;
 
 pub fn gen_ecc_cert_with_sign_type(spid: String, ias_key: String, sign_type: sgx_quote_sign_type_t) -> Result<(Vec<u8>, Vec<u8>), Error> {
     // Generate Keypair
-    // let ecc_handle = SgxEccHandle::new();
-    // let _result = ecc_handle.open();
-    // let (prv_k, pub_k) = ecc_handle.create_key_pair().unwrap();
+    let ecc_handle = SgxEccHandle::new();
+    let _result = ecc_handle.open();
+    let (prv_k, pub_k) = ecc_handle.create_key_pair().unwrap();
 
-    // let ocall = SgxCall {};
-    // let net = Net::new(spid, ias_key);
-    // let report = Attestation::create_report(&net, &ocall, sign_type)?;
+    let net = Net::new(spid, ias_key);
+    let report = Attestation::create_report(&net, &into_attition(pub_k), sign_type)?;
 
-    // let (key_der, cert_der) = RaX509Cert::generate(&report, &prv_k, &pub_k, &ecc_handle);
-    // let _result = ecc_handle.close();
-    // Ok((key_der, cert_der))
-    Ok((Vec::new(), Vec::new()))
+    let (key_der, cert_der) = RaX509Cert::<Attestation>::generate(&report, &prv_k, &pub_k, &ecc_handle);
+    let _result = ecc_handle.close();
+    Ok((key_der, cert_der))
+}
+
+pub fn into_attition(pub_k: sgx_ec256_public_t) -> [u8; 64] {
+    let mut pub_k_gx = pub_k.gx.clone();
+    pub_k_gx.reverse();
+    let mut pub_k_gy = pub_k.gy.clone();
+    pub_k_gy.reverse();
+    let mut addition:[u8; 64] = [0u8; 64];
+    addition[..32].clone_from_slice(&pub_k_gx);
+    addition[32..].clone_from_slice(&pub_k_gy);
+    addition
 }
 
 pub struct Utils {}

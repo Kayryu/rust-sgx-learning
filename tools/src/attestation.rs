@@ -133,12 +133,10 @@ impl SgxCall {
         };
 
         if result != sgx_status_t::SGX_SUCCESS {
-            error!("ocall_get_quote result={}", result);
             return Err(Error::SGXError(result));
         }
 
         if rt != sgx_status_t::SGX_SUCCESS {
-            error!("ocall_get_quote rt={}", rt);
             return Err(Error::SGXError(rt));
         }
 
@@ -225,7 +223,7 @@ impl Attestation {
     }
 
     pub fn verify(report: &AttestationReport, pub_k: &[u8]) -> Result<ReportData, Error> {
-        let attn_report_raw = report.ra_report;
+        let attn_report_raw = &report.ra_report;
         // Verify attestation report
         let attn_report: Value = serde_json::from_slice(&attn_report_raw).map_err(|_| Error::InvalidReport)?;
 

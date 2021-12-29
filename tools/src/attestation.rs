@@ -1,19 +1,13 @@
 use crate::error::Error;
-use sgx_types::sgx_quote_t;
-use sgx_types::sgx_ec256_public_t;
 use std::prelude::v1::*;
 use chrono::DateTime;
 use serde_json::Value;
 use itertools::Itertools;
 
-use sgx_types::sgx_quote_nonce_t;
-use sgx_types::sgx_report_t;
-use sgx_types::sgx_report_data_t;
-use sgx_tcrypto::rsgx_sha256_slice;
-use sgx_types::sgx_quote_sign_type_t;
 use crate::types::AttestationReport;
 
 use sgx_types::*;
+
 
 extern "C" {
     pub fn ocall_sgx_init_quote(

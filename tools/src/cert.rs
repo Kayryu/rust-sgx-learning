@@ -8,7 +8,6 @@ use sgx_types::*;
 
 use bit_vec::BitVec;
 use chrono::Duration;
-use chrono::TimeZone;
 use chrono::Utc as TzUtc;
 use num_bigint::BigUint;
 

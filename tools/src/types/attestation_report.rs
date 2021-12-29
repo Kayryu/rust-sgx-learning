@@ -40,7 +40,5 @@ mod tests {
     use serde_json::*;
 
     #[test]
-    fn test_report_to_payload() {
-        
-    }
+    fn test_report_to_payload() {}
 }

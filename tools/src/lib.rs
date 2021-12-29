@@ -2,8 +2,8 @@ mod cert;
 mod error;
 // mod attestation;
 // mod net;
-mod types;
 mod traits;
+mod types;
 
 /*
 目标，该库既能在sgx中编译，同时也能在native和wasm编译。
@@ -25,7 +25,7 @@ cargo.toml
 
 */
 
-use sgx_tcrypto::SgxEccHandle;
+// use sgx_tcrypto::SgxEccHandle;
 use sgx_types::*;
 use std::char;
 use std::prelude::v1::*;

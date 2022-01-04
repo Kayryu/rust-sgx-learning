@@ -243,10 +243,11 @@ impl Attestation {
 
         trace!("attn_report: {:?}", report_data);
 
-        let raw_report_timestamp = report_data.timestamp + "+0000";
+        let raw_report_timestamp = report_data.timestamp + "Z";
         let report_timestamp = chrono::DateTime::parse_from_rfc3339(&raw_report_timestamp)
             .or(Err(Error::InvalidReportTimestamp))?
             .timestamp();
+        
         if (now as i64 - report_timestamp) >= 7200 {
             return Err(Error::OutdatedReport);
         }
@@ -254,7 +255,7 @@ impl Attestation {
         let quote = base64::decode(&report_data.isv_enclave_quote_body).map_err(|_| Error::InvalidReportBody)?;
         trace!("Quote = {:?}", quote);
         
-        if quote.len() < 436 {
+        if quote.len() < 432 {
             return Err(Error::InvalidReportBody);
         }
 
@@ -263,6 +264,7 @@ impl Attestation {
         let mut enclave_field = EnclaveFields::default(); 
         enclave_field.version = sgx_quote.version;
         enclave_field.sign_type = sgx_quote.sign_type;
+        enclave_field.isv_enclave_quote_status = report_data.isv_enclave_quote_status;
         enclave_field.mr_enclave = sgx_quote.report_body.mr_enclave.m.try_into().map_err(|_| Error::InvalidReportField)?;
         enclave_field.mr_signer = sgx_quote.report_body.mr_signer.m.try_into().map_err(|_| Error::InvalidReportField)?;
         enclave_field.report_data = sgx_quote.report_body.report_data.d.try_into().map_err(|_| Error::InvalidReportField)?;

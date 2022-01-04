@@ -247,7 +247,10 @@ where
         // verify attestation report
         let enclave = V::verify(&report, now: u64)?;
 
-        
+        if enclave.report_data != pub_k.to_vec() {
+            error!("report_data[{:02x}] not equal public_key[{:02x}]", enclave.report_data.iter().format(""), pub_k.iter().format(""));
+            return Err(Error::InvalidPublicKey);
+        }
         return Ok(report_data);
     }
 

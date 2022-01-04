@@ -13,5 +13,6 @@ pub enum Error {
     InvalidReportBody,
     InvalidReportTimestamp,
     InvalidReportField,
+    InvalidPublicKey,
     OutdatedReport,
 }

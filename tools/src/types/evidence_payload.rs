@@ -12,25 +12,14 @@ pub struct EvidencePayload {
     /// enclave. See Quoting Data Structures for details
     ///
     /// This field is mandatory.
-    isvEnclaveQuote: String,
+    isv_enclave_quote: String,
     /// Base 64-encoded SGX Platform Service Security Property Descriptor structure provided by the platform.
     ///
     /// This field is optional, it will be present only if ISV enclave uses SGX Platform Service.
-    pseManifest: String,
+    pse_manifest: String,
     /// A string that represents custom nonce value provided by SP. Maximum size of the nonce is 32 characters.
     ///
     /// This field is optional
     /// If this field is present, it will be returned back to SP as part of Attestation Verification Report.
     nonce: String,
-}
-
-#[cfg(test)]
-mod tests {
-
-    const report_data:&str = "{\"id\":\"251938920532710053530482175012308117351\",\"timestamp\":\"2021-12-31T11:54:53.077742\",\"version\":3,\"epidPseudonym\":\"acJDwkzqp57/UHJDr10/xBxV3K6YmSNTDiaQ+tozR9ulUS4DlNjkqHDhy7K49fdPVt7E/KOugglK5/fsgADjrCSTPR9m5EvQaQlZ2wxoPBzKRUphQlXpHGQP3jLhGeXZ9ruz2N7mD314iz7QuyQn20gXaUf2WNoCIenPJdJ1L4I=\",\"isvEnclaveQuoteStatus\":\"GROUP_OUT_OF_DATE\",\"platformInfoBlob\":\"150200650400060000111102040180060000000000000000000C00000C000000020000000000000BFEBBC8926E89D90F3DC657D85B379E2EBC78D929579F022949112BD23BAF20CFC7C5194C113CF89366CBE5B34BC9C72663565BBEF6D67B073D52EECD779E8B9FCC\",\"isvEnclaveQuoteBody\":\"AgABAP4LAAALAAoAAAAAALbnkiiGROKVekCvIm9eTdgAAAAAAAAAAAAAAAAAAAAAEREDBf+ABgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABwAAAAAAAAAHAAAAAAAAADcKV0+kloo/ApsyWzAILJwT745uGT8YHhtp01MOMtpMAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACD1xnnferKFHD2uvYqTXdDA8iZ22kCD5xw7h38CMfOngAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAqlEPKrypKbtNc98F0ZJhTkQPNB0LM4V/UPoyqYX4lJBKfc5erTL2Ml8XNh9qqOW1rbilmTKvd8ES6FhTWXKca\"}";
-
-    #[test]
-    fn serde_test() {
-
-    }
 }

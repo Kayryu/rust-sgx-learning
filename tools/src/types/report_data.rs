@@ -25,7 +25,7 @@ pub struct ReportData {
 
 #[derive(Default, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct EnclaveFeilds {
+pub struct EnclaveFields {
     pub version: u16,
     pub sign_type: u16,
     pub report_data: Vec<u8>,

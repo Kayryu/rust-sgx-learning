@@ -45,6 +45,7 @@ use sgx_tcrypto::*;
 use sgx_types::*;
 use std::char;
 
+#[cfg(feature = "sgx")]
 pub fn gen_ecc_cert_with_sign_type(spid: String, ias_key: String, sign_type: sgx_quote_sign_type_t) -> Result<(Vec<u8>, Vec<u8>), Error> {
     // Generate Keypair
     let ecc_handle = SgxEccHandle::new();
@@ -57,6 +58,11 @@ pub fn gen_ecc_cert_with_sign_type(spid: String, ias_key: String, sign_type: sgx
     let (key_der, cert_der) = RaX509Cert::<Attestation>::generate(&report, &prv_k, &pub_k, &ecc_handle);
     let _result = ecc_handle.close();
     Ok((key_der, cert_der))
+}
+
+#[cfg(not(feature = "sgx"))]
+pub fn verify_cert(cert: &[u8], now: u64) -> Result<EnclaveFields, Error> {
+    RaX509Cert::<Attestation>::verify(&cert, now)
 }
 
 pub(crate) fn into_attition(pub_k: sgx_ec256_public_t) -> [u8; 64] {

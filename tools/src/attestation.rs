@@ -15,7 +15,7 @@ use sgx_tse::{rsgx_verify_report, rsgx_create_report};
 use sgx_tcrypto::rsgx_sha256_slice;
 
 use crate::traits::AttestationReportVerifier;
-use crate::types::{AttestationReport, EnclaveFeilds, ReportData};
+use crate::types::{AttestationReport, EnclaveFields, ReportData};
 use crate::error::Error;
 use crate::ias::Net;
 
@@ -228,7 +228,8 @@ impl Attestation {
         Ok(())
     }
 
-    pub fn verify(report: &AttestationReport, now: u64) -> Result<EnclaveFeilds, Error> {
+    #[cfg(not(sgx))]
+    pub fn verify(report: &AttestationReport, now: u64) -> Result<EnclaveFields, Error> {
         // Verify attestation report
         let report_data: ReportData = serde_json::from_slice(&report.ra_report).map_err(|_| Error::InvalidReport)?;
 
@@ -241,7 +242,7 @@ impl Attestation {
         if (now as i64 - report_timestamp) >= 7200 {
             return Err(Error::OutdatedReport);
         }
-    
+
         let quote = base64::decode(&report_data.isv_enclave_quote_body).map_err(|_| Error::InvalidReportBody)?;
         trace!("Quote = {:?}", quote);
         
@@ -251,7 +252,7 @@ impl Attestation {
 
         let sgx_quote: sgx_quote_t = unsafe { ptr::read(quote.as_ptr() as *const _) };
 
-        let mut enclave_field = EnclaveFeilds::default(); 
+        let mut enclave_field = EnclaveFields::default(); 
         enclave_field.version = sgx_quote.version;
         enclave_field.sign_type = sgx_quote.sign_type;
         enclave_field.mr_enclave = sgx_quote.report_body.mr_enclave.m.try_into().map_err(|_| Error::InvalidReportField)?;
@@ -263,7 +264,7 @@ impl Attestation {
 }
 
 impl AttestationReportVerifier for Attestation {
-    fn verify(report: &AttestationReport, now: u64) -> Result<EnclaveFeilds, Error> {
+    fn verify(report: &AttestationReport, now: u64) -> Result<EnclaveFields, Error> {
         Attestation::verify(report, now)
     }
 }

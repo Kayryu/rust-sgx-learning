@@ -200,7 +200,7 @@ where
     }
 
     #[cfg(not(feature = "sgx"))]
-    pub fn verify(cert: &[u8], now: u64) -> Result<EnclaveFeilds, Error> {
+    pub fn verify(cert: &[u8], now: u64) -> Result<EnclaveFields, Error> {
         // Before we reach here, Webpki already verifed the cert is properly signed
         let (payload, pub_k) = Self::extract_data(&cert)?;
         // Extract each field
@@ -251,9 +251,10 @@ where
             error!("report_data[{:02x}] not equal public_key[{:02x}]", enclave.report_data.iter().format(""), pub_k.iter().format(""));
             return Err(Error::InvalidPublicKey);
         }
-        return Ok(report_data);
+        return Ok(enclave);
     }
 
+    #[cfg(not(feature = "sgx"))]
     pub(crate) fn extract_data(cert_der: &[u8]) -> Result<(Vec<u8>, Vec<u8>), Error> {
         // Search for Public Key prime256v1 OID
         let prime256v1_oid = &[0x06, 0x08, 0x2A, 0x86, 0x48, 0xCE, 0x3D, 0x03, 0x01, 0x07];
@@ -303,8 +304,8 @@ mod tests {
     use std::time::{SystemTime, UNIX_EPOCH};
 
     struct MockVerifier;
-    impl AttestationReportVerifier for EnclaveFeilds {
-        fn verify(report: &AttestationReport) -> Result<EnclaveFeilds, Error> {
+    impl AttestationReportVerifier for EnclaveFields {
+        fn verify(report: &AttestationReport) -> Result<EnclaveFields, Error> {
             Ok(ReportData::default())
         }
     }
@@ -323,6 +324,6 @@ mod tests {
     fn valid_cert_should_ok() {
         let now = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs();
         let ret = RaX509Cert::<MockVerifier>::verify(valid_cert, now);
-        assert_eq!(ret.ok(), Some(EnclaveFeilds::default()));
+        assert_eq!(ret.ok(), Some(EnclaveFields::default()));
     }
 }

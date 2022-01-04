@@ -7,6 +7,7 @@ extern crate sgx_tstd as std;
 mod certificate;
 mod error;
 mod attestation;
+#[cfg(feature = "sgx")]
 mod ias;
 mod traits;
 mod types;
@@ -15,6 +16,7 @@ pub use certificate::RaX509Cert;
 pub use error::Error;
 pub use traits::AttestationReportVerifier;
 pub use types::*;
+#[cfg(feature = "sgx")]
 pub use ias::Net;
 pub use attestation::Attestation;
 pub use sgx_types::sgx_quote_sign_type_t;
@@ -41,12 +43,13 @@ cargo.toml
 
 */
 
-use sgx_tcrypto::*;
+
 use sgx_types::*;
 use std::char;
 
 #[cfg(feature = "sgx")]
 pub fn gen_ecc_cert_with_sign_type(spid: String, ias_key: String, sign_type: sgx_quote_sign_type_t) -> Result<(Vec<u8>, Vec<u8>), Error> {
+    use sgx_tcrypto::*;
     // Generate Keypair
     let ecc_handle = SgxEccHandle::new();
     let _result = ecc_handle.open();

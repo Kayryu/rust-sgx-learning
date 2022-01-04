@@ -5,18 +5,24 @@ use serde_json::Value;
 use itertools::Itertools;
 use log::{info, debug, error, trace};
 use std::time::{SystemTime, UNIX_EPOCH};
-use rand::RngCore as _;
-use std::untrusted::time::SystemTimeEx;
+
 use std::io::BufReader;
 use core::convert::TryInto;
 
 use sgx_types::*;
+#[cfg(feature = "sgx")]
+use rand::RngCore as _;
+#[cfg(feature = "sgx")]
+use std::untrusted::time::SystemTimeEx;
+#[cfg(feature = "sgx")]
 use sgx_tse::{rsgx_verify_report, rsgx_create_report};
+#[cfg(feature = "sgx")]
 use sgx_tcrypto::rsgx_sha256_slice;
 
 use crate::traits::AttestationReportVerifier;
 use crate::types::{AttestationReport, EnclaveFields, ReportData};
 use crate::error::Error;
+#[cfg(feature = "sgx")]
 use crate::ias::Net;
 
 extern "C" {
@@ -153,6 +159,7 @@ pub struct Attestation {}
 impl Attestation {
     // TODO, with rand
     // the funciton only executed in encalve.
+    #[cfg(feature = "sgx")]
     pub fn create_report(
         net: &Net,
         addition: &[u8],
@@ -208,6 +215,7 @@ impl Attestation {
     // report.data = SHA256(p_nonce||p_quote). The ISV enclave can verify the
     // p_qe_report and report.data to confirm the QUOTE has not be modified and
     // is not a replay. It is optional.
+    #[cfg(feature = "sgx")]
     fn defend_replay(quote_nonce: &sgx_quote_nonce_t, quote_buf:&[u8], qe_report: &sgx_report_t) -> Result<(), Error> {
         let mut rhs_vec: Vec<u8> = quote_nonce.rand.to_vec();
         rhs_vec.extend(quote_buf);

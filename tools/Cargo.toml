@@ -6,58 +6,57 @@ edition = "2018"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-# chrono      = "0.4.5"
-# webpki      = "0.21"
-# rustls      = { version = "0.19", features = ["dangerous_configuration"] }
-# itertools   = "*"
-# base64      = "0.9.2"
-# serde       = { version = "1.0.130", features = ["derive"] }
-# serde_json  = "1.0"
-# num-bigint  = "*"
-# bit-vec     = "*"
-# hex         = "*"
-# rand = "0.7.3"
+chrono = "0.4.5"
+webpki = "0.21"
+rustls = { version = "0.19", features = ["dangerous_configuration"] }
+base64 = "0.9.2"
+serde = { version = "1.0.130", features = ["derive"] }
+serde_json = "1.0"
+num-bigint = "*"
+hex  = "*"
+log = "*"
+env_logger = "*"
 
 bit-vec = { version = "*", default-features = false}
 httparse = { version = "1.3.2", default-features = false }
 itertools = { version = "0.8", default-features = false}
 
 sgx_types = { git = "https://github.com/apache/teaclave-sgx-sdk.git", rev = "v1.1.3" }
-sgx_tstd = { git = "https://github.com/apache/teaclave-sgx-sdk.git", rev = "v1.1.3", features = ["net"], optional = true }
-sgx_tse = { git = "https://github.com/apache/teaclave-sgx-sdk.git", rev = "v1.1.3", optional = true }
-sgx_tcrypto = { git = "https://github.com/apache/teaclave-sgx-sdk.git", rev = "v1.1.3", optional = true }
+# sgx_tstd = { git = "https://github.com/apache/teaclave-sgx-sdk.git", rev = "v1.1.3", features = ["net"], optional = true }
+# sgx_tse = { git = "https://github.com/apache/teaclave-sgx-sdk.git", rev = "v1.1.3", optional = true }
+# sgx_tcrypto = { git = "https://github.com/apache/teaclave-sgx-sdk.git", rev = "v1.1.3", optional = true }
 
-yasna = { git = "https://github.com/mesalock-linux/yasna.rs-sgx", features = ["bit-vec", "num-bigint", "chrono"], optional = true }
-chrono = { git = "https://github.com/mesalock-linux/chrono-sgx", optional = true }
-webpki = { git = "https://github.com/mesalock-linux/webpki", branch = "mesalock_sgx", optional = true }
-base64 = { git = "https://github.com/mesalock-linux/rust-base64-sgx", optional = true }
-num-bigint = { git = "https://github.com/mesalock-linux/num-bigint-sgx", optional = true }
-rustls = { git = "https://github.com/mesalock-linux/rustls", branch = "mesalock_sgx", optional = true }
-webpki-roots = { git = "https://github.com/mesalock-linux/webpki-roots", branch = "mesalock_sgx", optional = true }
-log = { git = "https://github.com/mesalock-linux/log-sgx.git", optional = true }
-env_logger = { git = "https://github.com/mesalock-linux/env_logger-sgx.git", optional = true }
-serde_json = { git = "https://github.com/mesalock-linux/serde-json-sgx.git", optional = true }
-rand = { version = "0.7.3", git = "https://github.com/mesalock-linux/rand-sgx.git", optional = true }
-serde = { git = "https://github.com/mesalock-linux/serde-sgx.git", features = ["derive"], optional = true }
+# yasna = { git = "https://github.com/mesalock-linux/yasna.rs-sgx", features = ["bit-vec", "num-bigint", "chrono"], optional = true }
+# chrono = { git = "https://github.com/mesalock-linux/chrono-sgx", optional = true }
+# webpki = { git = "https://github.com/mesalock-linux/webpki", branch = "mesalock_sgx", optional = true }
+# base64 = { git = "https://github.com/mesalock-linux/rust-base64-sgx", optional = true }
+# num-bigint = { git = "https://github.com/mesalock-linux/num-bigint-sgx", optional = true }
+# rustls = { git = "https://github.com/mesalock-linux/rustls", branch = "mesalock_sgx", optional = true }
+# webpki-roots = { git = "https://github.com/mesalock-linux/webpki-roots", branch = "mesalock_sgx", optional = true }
+# log = { git = "https://github.com/mesalock-linux/log-sgx.git", optional = true }
+# env_logger = { git = "https://github.com/mesalock-linux/env_logger-sgx.git", optional = true }
+# serde_json = { git = "https://github.com/mesalock-linux/serde-json-sgx.git", optional = true }
+# rand = { version = "0.7.3", git = "https://github.com/mesalock-linux/rand-sgx.git", optional = true }
+# serde = { git = "https://github.com/mesalock-linux/serde-sgx.git", features = ["derive"], optional = true }
 
 [features]
-default = ["sgx"]
+default = ["std"]
 std = []
 sgx = [
-    "sgx_tstd",
-    "sgx_tse",
-    "sgx_tcrypto",
-    "yasna",
-    "chrono",
-    "webpki",
-    "base64",
-    "webpki-roots",
-    "rustls",
-    "num-bigint",
-    "env_logger",
-    "log",
-    "serde_json",
-    "rand",
-    "serde"
+    # "sgx_tstd",
+    # "sgx_tse",
+    # "sgx_tcrypto",
+    # "yasna",
+    # "chrono",
+    # "webpki",
+    # "base64",
+    # "webpki-roots",
+    # "rustls",
+    # "num-bigint",
+    # "env_logger",
+    # "log",
+    # "serde_json",
+    # "rand",
+    # "serde"
 ]
 wasm = []

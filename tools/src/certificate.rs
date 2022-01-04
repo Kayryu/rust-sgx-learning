@@ -11,6 +11,8 @@ use chrono::Duration;
 use chrono::TimeZone;
 use chrono::Utc as TzUtc;
 use num_bigint::BigUint;
+use log::error;
+use itertools::Itertools;
 
 #[cfg(feature = "sgx")]
 use yasna::models::ObjectIdentifier;
@@ -21,8 +23,7 @@ use crate::std::untrusted::time::SystemTimeEx;
 
 use crate::error::Error;
 use crate::traits::AttestationReportVerifier;
-use crate::types::AttestationReport;
-// use crate::types::ReportData;
+use crate::types::{AttestationReport, EnclaveFields};
 
 pub const CERTEXPIRYDAYS: i64 = 90i64;
 const ISSUER: &str = "SafeMatrix";
@@ -245,7 +246,7 @@ where
             .map_err(|_| Error::InvalidIASSigningCert)?;
 
         // verify attestation report
-        let enclave = V::verify(&report, now: u64)?;
+        let enclave = V::verify(&report, now)?;
 
         if enclave.report_data != pub_k.to_vec() {
             error!("report_data[{:02x}] not equal public_key[{:02x}]", enclave.report_data.iter().format(""), pub_k.iter().format(""));

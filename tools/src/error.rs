@@ -10,4 +10,8 @@ pub enum Error {
     InvalidIASSigningCert,
     InvalidReport,
     InvalidReportPayload,
+    InvalidReportBody,
+    InvalidReportTimestamp,
+    InvalidReportField,
+    OutdatedReport,
 }

@@ -45,7 +45,6 @@ use sgx_tcrypto::*;
 use sgx_types::*;
 use std::char;
 
-
 pub fn gen_ecc_cert_with_sign_type(spid: String, ias_key: String, sign_type: sgx_quote_sign_type_t) -> Result<(Vec<u8>, Vec<u8>), Error> {
     // Generate Keypair
     let ecc_handle = SgxEccHandle::new();
@@ -60,7 +59,7 @@ pub fn gen_ecc_cert_with_sign_type(spid: String, ias_key: String, sign_type: sgx
     Ok((key_der, cert_der))
 }
 
-pub fn into_attition(pub_k: sgx_ec256_public_t) -> [u8; 64] {
+pub(crate) fn into_attition(pub_k: sgx_ec256_public_t) -> [u8; 64] {
     let mut pub_k_gx = pub_k.gx.clone();
     pub_k_gx.reverse();
     let mut pub_k_gy = pub_k.gy.clone();

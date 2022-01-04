@@ -200,7 +200,7 @@ where
     }
 
     #[cfg(not(feature = "sgx"))]
-    pub fn verify(cert: &[u8], now: u64) -> Result<ReportData, Error> {
+    pub fn verify(cert: &[u8], now: u64) -> Result<EnclaveFeilds, Error> {
         // Before we reach here, Webpki already verifed the cert is properly signed
         let (payload, pub_k) = Self::extract_data(&cert)?;
         // Extract each field
@@ -245,8 +245,9 @@ where
             .map_err(|_| Error::InvalidIASSigningCert)?;
 
         // verify attestation report
-        let report_data = V::verify(&report)?;
+        let enclave = V::verify(&report, now: u64)?;
 
+        
         return Ok(report_data);
     }
 
@@ -299,8 +300,8 @@ mod tests {
     use std::time::{SystemTime, UNIX_EPOCH};
 
     struct MockVerifier;
-    impl AttestationReportVerifier for MockVerifier {
-        fn verify(report: &AttestationReport) -> Result<ReportData, Error> {
+    impl AttestationReportVerifier for EnclaveFeilds {
+        fn verify(report: &AttestationReport) -> Result<EnclaveFeilds, Error> {
             Ok(ReportData::default())
         }
     }
@@ -319,6 +320,6 @@ mod tests {
     fn valid_cert_should_ok() {
         let now = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs();
         let ret = RaX509Cert::<MockVerifier>::verify(valid_cert, now);
-        assert_eq!(ret.ok(), Some(ReportData::default()));
+        assert_eq!(ret.ok(), Some(EnclaveFeilds::default()));
     }
 }

@@ -1,7 +1,7 @@
 use crate::error::Error;
 use crate::types::AttestationReport;
-use crate::types::ReportData;
+use crate::types::EnclaveFeilds;
 
 pub trait AttestationReportVerifier {
-    fn verify(report: &AttestationReport, pub_k: &[u8]) -> Result<ReportData, Error>;
+    fn verify(report: &AttestationReport, now: u64) -> Result<EnclaveFeilds, Error>;
 }

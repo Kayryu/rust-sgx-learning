@@ -39,6 +39,7 @@ log = { git = "https://github.com/mesalock-linux/log-sgx.git" }
 env_logger = { git = "https://github.com/mesalock-linux/env_logger-sgx.git" }
 serde_json = { git = "https://github.com/mesalock-linux/serde-json-sgx.git" }
 rand = { version = "0.7.3", git = "https://github.com/mesalock-linux/rand-sgx.git" }
+serde = { git = "https://github.com/mesalock-linux/serde-sgx.git", features = ["derive"] }
 
 [features]
 default = ["sgx"]

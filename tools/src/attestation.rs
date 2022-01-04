@@ -3,18 +3,19 @@ use std::ptr;
 use chrono::DateTime;
 use serde_json::Value;
 use itertools::Itertools;
-use log::{info, debug, error};
+use log::{info, debug, error, trace};
 use std::time::{SystemTime, UNIX_EPOCH};
 use rand::RngCore as _;
 use std::untrusted::time::SystemTimeEx;
 use std::io::BufReader;
+use core::convert::TryInto;
 
 use sgx_types::*;
 use sgx_tse::{rsgx_verify_report, rsgx_create_report};
 use sgx_tcrypto::rsgx_sha256_slice;
 
 use crate::traits::AttestationReportVerifier;
-use crate::types::{AttestationReport, ReportData};
+use crate::types::{AttestationReport, EnclaveFeilds, ReportData};
 use crate::error::Error;
 use crate::ias::Net;
 
@@ -146,6 +147,15 @@ impl SgxCall {
     }
 }
 
+pub const IAS_QUOTE_STATUS_LEVEL_1: &[&str] = &["OK"];
+pub const IAS_QUOTE_STATUS_LEVEL_2: &[&str] = &["SW_HARDENING_NEEDED"];
+pub const IAS_QUOTE_STATUS_LEVEL_3: &[&str] = &[
+	"CONFIGURATION_NEEDED",
+	"CONFIGURATION_AND_SW_HARDENING_NEEDED",
+];
+// LEVEL 4 is LEVEL 3 with advisors which not included in whitelist
+pub const IAS_QUOTE_STATUS_LEVEL_5: &[&str] = &["GROUP_OUT_OF_DATE"];
+
 #[derive(Default)]
 pub struct Attestation {}
 
@@ -227,90 +237,43 @@ impl Attestation {
         Ok(())
     }
 
-    pub fn verify(report: &AttestationReport, pub_k: &[u8]) -> Result<ReportData, Error> {
-        let attn_report_raw = &report.ra_report;
+    pub fn verify(report: &AttestationReport, now: u64) -> Result<EnclaveFeilds, Error> {
         // Verify attestation report
-        let attn_report: Value = serde_json::from_slice(&attn_report_raw).map_err(|_| Error::InvalidReport)?;
+        let report_data: ReportData = serde_json::from_slice(&report.ra_report).map_err(|_| Error::InvalidReport)?;
 
-        if let Value::String(time) = &attn_report["timestamp"] {
-            let time_fixed = time.clone() + "+0000";
-            let ts = DateTime::parse_from_str(&time_fixed, "%Y-%m-%dT%H:%M:%S%.f%z")
-                .unwrap()
-                .timestamp();
-            let now = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs() as i64;
-            println!("Time diff = {}", now - ts);
-        } else {
-            println!("Failed to fetch timestamp from attestation report");
-            return Err(Error::SGXError(sgx_status_t::SGX_ERROR_UNEXPECTED));
+        trace!("attn_report: {:?}", report_data);
+
+        let raw_report_timestamp = report_data.timestamp + "+0000";
+        let report_timestamp = chrono::DateTime::parse_from_rfc3339(&raw_report_timestamp)
+            .or(Err(Error::InvalidReportTimestamp))?
+            .timestamp();
+        if (now as i64 - report_timestamp) >= 7200 {
+            return Err(Error::OutdatedReport);
+        }
+    
+        let quote = base64::decode(&report_data.isv_enclave_quote_body).map_err(|_| Error::InvalidReportBody)?;
+        trace!("Quote = {:?}", quote);
+        
+        if quote.len() < 436 {
+            return Err(Error::InvalidReportBody);
         }
 
-        // 2. Verify quote status (mandatory field)
-        if let Value::String(quote_status) = &attn_report["isvEnclaveQuoteStatus"] {
-            println!("isvEnclaveQuoteStatus = {}", quote_status);
-            match quote_status.as_ref() {
-                "OK" => (),
-                "GROUP_OUT_OF_DATE" | "GROUP_REVOKED" | "CONFIGURATION_NEEDED" => {
-                    // Verify platformInfoBlob for further info if status not OK
-                    if let Value::String(pib) = &attn_report["platformInfoBlob"] {
-                        // let got_pib = platform_info::from_str(&pib);
-                        // println!("{:?}", got_pib);
-                    } else {
-                        println!("Failed to fetch platformInfoBlob from attestation report");
-                        return Err(Error::SGXError(sgx_status_t::SGX_ERROR_UNEXPECTED));
-                    }
-                }
-                _ => return Err(Error::SGXError(sgx_status_t::SGX_ERROR_UNEXPECTED)),
-            }
-        } else {
-            println!("Failed to fetch isvEnclaveQuoteStatus from attestation report");
-            return Err(Error::SGXError(sgx_status_t::SGX_ERROR_UNEXPECTED));
-        }
+        let sgx_quote: sgx_quote_t = unsafe { ptr::read(quote.as_ptr() as *const _) };
 
-        // 3. Verify quote body
-        if let Value::String(quote_raw) = &attn_report["isvEnclaveQuoteBody"] {
-            let quote = base64::decode(&quote_raw).unwrap();
-            println!("Quote = {:?}", quote);
-            // TODO: lack security check here
-            let sgx_quote: sgx_quote_t = unsafe { ptr::read(quote.as_ptr() as *const _) };
+        let mut enclave_field = EnclaveFeilds::default(); 
+        enclave_field.version = sgx_quote.version;
+        enclave_field.sign_type = sgx_quote.sign_type;
+        enclave_field.mr_enclave = sgx_quote.report_body.mr_enclave.m.try_into().map_err(|_| Error::InvalidReportField)?;
+        enclave_field.mr_signer = sgx_quote.report_body.mr_signer.m.try_into().map_err(|_| Error::InvalidReportField)?;
+        enclave_field.report_data = sgx_quote.report_body.report_data.d.try_into().map_err(|_| Error::InvalidReportField)?;
 
-            // Borrow of packed field is unsafe in future Rust releases
-            // ATTENTION
-            // DO SECURITY CHECK ON DEMAND
-            // DO SECURITY CHECK ON DEMAND
-            // DO SECURITY CHECK ON DEMAND
-            unsafe {
-                println!("sgx quote version = {}", sgx_quote.version);
-                println!("sgx quote signature type = {}", sgx_quote.sign_type);
-                println!(
-                    "sgx quote report_data = {:02x}",
-                    sgx_quote.report_body.report_data.d.iter().format("")
-                );
-                println!(
-                    "sgx quote mr_enclave = {:02x}",
-                    sgx_quote.report_body.mr_enclave.m.iter().format("")
-                );
-                println!(
-                    "sgx quote mr_signer = {:02x}",
-                    sgx_quote.report_body.mr_signer.m.iter().format("")
-                );
-            }
-
-            println!("Anticipated public key = {:02x}", pub_k.iter().format(""));
-            if sgx_quote.report_body.report_data.d.to_vec() == pub_k.to_vec() {
-                println!("ue RA done!");
-            }
-        } else {
-            println!("Failed to fetch isvEnclaveQuoteBody from attestation report");
-            return Err(Error::SGXError(sgx_status_t::SGX_ERROR_UNEXPECTED));
-        }
-
-        return Ok(ReportData::default());
+        return Ok(enclave_field);
     }
 }
 
 impl AttestationReportVerifier for Attestation {
-    fn verify(report: &AttestationReport, pub_k: &[u8]) -> Result<ReportData, Error> {
-        Attestation::verify(report, pub_k)
+    fn verify(report: &AttestationReport, now: u64) -> Result<EnclaveFeilds, Error> {
+        Attestation::verify(report, now)
     }
 }
 

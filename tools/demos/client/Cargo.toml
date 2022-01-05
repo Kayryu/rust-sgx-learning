@@ -8,4 +8,4 @@ edition = "2018"
 [dependencies]
 webpki      = "0.21"
 rustls      = { version = "0.19", features = ["dangerous_configuration"] }
-tra = { package = "tra", path = "./../../" }
+tra = { path = "./../../", default-features = false, features = ["std"] }

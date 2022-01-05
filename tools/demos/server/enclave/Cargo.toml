@@ -22,4 +22,4 @@ sgx_tcrypto = { git = "https://github.com/apache/teaclave-sgx-sdk.git", rev = "v
 rustls = { git = "https://github.com/mesalock-linux/rustls", branch = "mesalock_sgx" }
 log = { git = "https://github.com/mesalock-linux/log-sgx.git" }
 env_logger = { git = "https://github.com/mesalock-linux/env_logger-sgx.git" }
-tra = { package = "tra", path = "./../../../" }
+tra = { path = "./../../../", default-features = false, features = ["sgx"] }

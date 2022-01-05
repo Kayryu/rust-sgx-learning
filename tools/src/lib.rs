@@ -18,15 +18,9 @@ extern crate sgx_rustls as rustls;
 #[cfg(feature = "sgx")]
 extern crate sgx_webpki_roots as webpki_roots;
 #[cfg(feature = "sgx")]
-extern crate sgx_serde_json as serde_json;
-#[cfg(feature = "sgx")]
 extern crate sgx_rand as rand;
 #[cfg(feature = "sgx")]
 extern crate sgx_chrono as chrono;
-
-// #[cfg(feature = "sgx")]
-// #[macro_use]
-// extern crate sgx_serde as serde;
 
 mod certificate;
 mod error;

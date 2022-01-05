@@ -2,15 +2,15 @@ use std::io::{self, Read, Write};
 use std::net::TcpStream;
 use std::str;
 use std::sync::Arc;
-use tra::{AttestationReportVerifier, RaX509Cert, ReportData, AttestationReport, Error};
+use tra::{AttestationReportVerifier, RaX509Cert, EnclaveFields, AttestationReport, Error, verify_cert};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 const SERVERADDR: &str = "13.82.110.144:8448";
 
 struct MockVerifier;
 impl AttestationReportVerifier for MockVerifier {
-    fn verify(_report: &AttestationReport) -> Result<ReportData, Error> {
-        Ok(ReportData::default())
+    fn verify(_report: &AttestationReport, now: u64) -> Result<EnclaveFields, Error> {
+        Ok(EnclaveFields::default())
     }
 }
 
@@ -34,9 +34,9 @@ impl rustls::ServerCertVerifier for ServerAuth {
     ) -> Result<rustls::ServerCertVerified, rustls::TLSError> {
         // This call will automatically verify cert is properly signed
         let now = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs();
-        match RaX509Cert::<MockVerifier>::verify(&_certs[0].0, now) {
+        match verify_cert(&_certs[0].0, now) {
             Ok(a) => {
-                println!("default: {:?}", a);
+                println!("enclave fields: {}", a);
                 Ok(rustls::ServerCertVerified::assertion())
             },
             Err(_) => Err(rustls::TLSError::WebPKIError(webpki::Error::ExtensionValueInvalid)),

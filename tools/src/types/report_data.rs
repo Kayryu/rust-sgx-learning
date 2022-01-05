@@ -2,6 +2,8 @@
 
 use std::prelude::v1::*;
 use serde::{self, Serialize, Deserialize};
+use std::fmt;
+use itertools::Itertools;
 
 #[derive(Default, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -36,6 +38,14 @@ pub struct EnclaveFields {
     pub isv_enclave_quote_status: String,
 }
 
+impl fmt::Display for EnclaveFields {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{{ version: {}, sign_type: {}, report_data: \"{:02x}\", mr_enclave: \"{:02x}\", mr_signer: \"{:02x}\", isv_prod_id: {}, isv_svn: {}, isv_enclave_quote_status: \"{}\" }}", 
+        self.version, self.sign_type, self.report_data.iter().format(""),
+        self.mr_enclave.iter().format(""), self.mr_signer.iter().format(""),
+        self.isv_prod_id, self.isv_svn, self.isv_enclave_quote_status)
+    }
+}
 
 #[cfg(test)]
 mod tests {

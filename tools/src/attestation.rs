@@ -1,21 +1,15 @@
-use chrono::DateTime;
-use itertools::Itertools;
-use log::{debug, error, info, trace};
-use serde_json::Value;
 use std::prelude::v1::*;
 use std::ptr;
-use std::time::{SystemTime, UNIX_EPOCH};
-
 use core::convert::TryInto;
-use std::io::BufReader;
-
+use sgx_types::*;
+#[cfg(feature = "sgx")]
+use itertools::Itertools;
 #[cfg(feature = "sgx")]
 use rand::RngCore as _;
 #[cfg(feature = "sgx")]
 use sgx_tcrypto::rsgx_sha256_slice;
 #[cfg(feature = "sgx")]
 use sgx_tse::{rsgx_create_report, rsgx_verify_report};
-use sgx_types::*;
 #[cfg(feature = "sgx")]
 use std::untrusted::time::SystemTimeEx;
 
@@ -180,7 +174,7 @@ impl Attestation {
         let mut report_data: sgx_report_data_t = sgx_report_data_t::default();
         report_data.d[..addition.len()].clone_from_slice(addition);
         let report = rsgx_create_report(&ti, &report_data).map_err(|e| {
-            error!("Report creation failed {}", e);
+            log::error!("Report creation failed {}", e);
             return Error::SGXError(e);
         })?;
 
@@ -196,7 +190,7 @@ impl Attestation {
             || ti.attributes.flags != qe_report.body.attributes.flags
             || ti.attributes.xfrm != qe_report.body.attributes.xfrm
         {
-            error!("qe_report does not match current target_info!");
+            log::error!("qe_report does not match current target_info!");
             return Err(Error::SGXError(sgx_status_t::SGX_ERROR_UNEXPECTED));
         }
 
@@ -220,17 +214,17 @@ impl Attestation {
         let mut rhs_vec: Vec<u8> = quote_nonce.rand.to_vec();
         rhs_vec.extend(quote_buf);
         let rhs_hash = rsgx_sha256_slice(&rhs_vec[..]).map_err(|e| {
-            error!("Sha256 error: {}", e);
+            log::error!("Sha256 error: {}", e);
             return Error::SGXError(e);
         })?;
 
         let lhs_hash = &qe_report.body.report_data.d[..32];
 
-        debug!("rhs hash = {:02X}", rhs_hash.iter().format(""));
-        debug!("report hs= {:02X}", lhs_hash.iter().format(""));
+        log::debug!("rhs hash = {:02X}", rhs_hash.iter().format(""));
+        log::debug!("report hs= {:02X}", lhs_hash.iter().format(""));
 
         if rhs_hash != lhs_hash {
-            error!("Quote is tampered!");
+            log::error!("Quote is tampered!");
             return Err(Error::SGXError(sgx_status_t::SGX_ERROR_UNEXPECTED));
         }
         Ok(())
@@ -241,7 +235,7 @@ impl Attestation {
         // Verify attestation report
         let report_data: ReportData = serde_json::from_slice(&report.ra_report).map_err(|_| Error::InvalidReport)?;
 
-        trace!("attn_report: {:?}", report_data);
+        log::trace!("attn_report: {:?}", report_data);
 
         let raw_report_timestamp = report_data.timestamp + "Z";
         let report_timestamp = chrono::DateTime::parse_from_rfc3339(&raw_report_timestamp)
@@ -253,7 +247,7 @@ impl Attestation {
         }
 
         let quote = base64::decode(&report_data.isv_enclave_quote_body).map_err(|_| Error::InvalidReportBody)?;
-        trace!("Quote = {:?}", quote);
+        log::trace!("Quote = {:?}", quote);
 
         if quote.len() < 432 {
             return Err(Error::InvalidReportBody);

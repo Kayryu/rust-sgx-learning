@@ -1,5 +1,5 @@
+use serde::{self, Deserialize, Serialize};
 use std::prelude::v1::*;
-use serde::{self, Serialize, Deserialize};
 
 /// Attestation Evidence Payload is a data structure submitted by the Service Provider to IAS so that
 /// identity of the ISV enclave and the validity of the platform can be verified.

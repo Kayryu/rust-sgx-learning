@@ -1,9 +1,9 @@
 // from https://www.intel.com/content/dam/develop/public/us/en/documents/sgx-attestation-api-spec.pdf
 
-use std::prelude::v1::*;
-use serde::{self, Serialize, Deserialize};
-use std::fmt;
 use itertools::Itertools;
+use serde::{self, Deserialize, Serialize};
+use std::fmt;
+use std::prelude::v1::*;
 
 #[derive(Default, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]

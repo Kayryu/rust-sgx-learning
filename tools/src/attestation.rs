@@ -1,29 +1,29 @@
+use chrono::DateTime;
+use itertools::Itertools;
+use log::{debug, error, info, trace};
+use serde_json::Value;
 use std::prelude::v1::*;
 use std::ptr;
-use chrono::DateTime;
-use serde_json::Value;
-use itertools::Itertools;
-use log::{info, debug, error, trace};
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use std::io::BufReader;
 use core::convert::TryInto;
+use std::io::BufReader;
 
-use sgx_types::*;
 #[cfg(feature = "sgx")]
 use rand::RngCore as _;
 #[cfg(feature = "sgx")]
-use std::untrusted::time::SystemTimeEx;
-#[cfg(feature = "sgx")]
-use sgx_tse::{rsgx_verify_report, rsgx_create_report};
-#[cfg(feature = "sgx")]
 use sgx_tcrypto::rsgx_sha256_slice;
+#[cfg(feature = "sgx")]
+use sgx_tse::{rsgx_create_report, rsgx_verify_report};
+use sgx_types::*;
+#[cfg(feature = "sgx")]
+use std::untrusted::time::SystemTimeEx;
 
-use crate::traits::AttestationReportVerifier;
-use crate::types::{AttestationReport, EnclaveFields, ReportData};
 use crate::error::Error;
 #[cfg(feature = "sgx")]
 use crate::ias::Net;
+use crate::traits::AttestationReportVerifier;
+use crate::types::{AttestationReport, EnclaveFields, ReportData};
 
 extern "C" {
     pub fn ocall_sgx_init_quote(
@@ -90,7 +90,7 @@ impl SgxCall {
         if rt != sgx_status_t::SGX_SUCCESS {
             return Err(Error::SGXError(rt));
         }
-        return Ok(ias_sock)
+        return Ok(ias_sock);
     }
 
     fn get_quote(
@@ -216,7 +216,7 @@ impl Attestation {
     // p_qe_report and report.data to confirm the QUOTE has not be modified and
     // is not a replay. It is optional.
     #[cfg(feature = "sgx")]
-    fn defend_replay(quote_nonce: &sgx_quote_nonce_t, quote_buf:&[u8], qe_report: &sgx_report_t) -> Result<(), Error> {
+    fn defend_replay(quote_nonce: &sgx_quote_nonce_t, quote_buf: &[u8], qe_report: &sgx_report_t) -> Result<(), Error> {
         let mut rhs_vec: Vec<u8> = quote_nonce.rand.to_vec();
         rhs_vec.extend(quote_buf);
         let rhs_hash = rsgx_sha256_slice(&rhs_vec[..]).map_err(|e| {
@@ -225,7 +225,7 @@ impl Attestation {
         })?;
 
         let lhs_hash = &qe_report.body.report_data.d[..32];
-        
+
         debug!("rhs hash = {:02X}", rhs_hash.iter().format(""));
         debug!("report hs= {:02X}", lhs_hash.iter().format(""));
 
@@ -247,27 +247,42 @@ impl Attestation {
         let report_timestamp = chrono::DateTime::parse_from_rfc3339(&raw_report_timestamp)
             .or(Err(Error::InvalidReportTimestamp))?
             .timestamp();
-        
+
         if (now as i64 - report_timestamp) >= 7200 {
             return Err(Error::OutdatedReport);
         }
 
         let quote = base64::decode(&report_data.isv_enclave_quote_body).map_err(|_| Error::InvalidReportBody)?;
         trace!("Quote = {:?}", quote);
-        
+
         if quote.len() < 432 {
             return Err(Error::InvalidReportBody);
         }
 
         let sgx_quote: sgx_quote_t = unsafe { ptr::read(quote.as_ptr() as *const _) };
 
-        let mut enclave_field = EnclaveFields::default(); 
+        let mut enclave_field = EnclaveFields::default();
         enclave_field.version = sgx_quote.version;
         enclave_field.sign_type = sgx_quote.sign_type;
         enclave_field.isv_enclave_quote_status = report_data.isv_enclave_quote_status;
-        enclave_field.mr_enclave = sgx_quote.report_body.mr_enclave.m.try_into().map_err(|_| Error::InvalidReportField)?;
-        enclave_field.mr_signer = sgx_quote.report_body.mr_signer.m.try_into().map_err(|_| Error::InvalidReportField)?;
-        enclave_field.report_data = sgx_quote.report_body.report_data.d.try_into().map_err(|_| Error::InvalidReportField)?;
+        enclave_field.mr_enclave = sgx_quote
+            .report_body
+            .mr_enclave
+            .m
+            .try_into()
+            .map_err(|_| Error::InvalidReportField)?;
+        enclave_field.mr_signer = sgx_quote
+            .report_body
+            .mr_signer
+            .m
+            .try_into()
+            .map_err(|_| Error::InvalidReportField)?;
+        enclave_field.report_data = sgx_quote
+            .report_body
+            .report_data
+            .d
+            .try_into()
+            .map_err(|_| Error::InvalidReportField)?;
 
         return Ok(enclave_field);
     }
@@ -278,4 +293,3 @@ impl AttestationReportVerifier for Attestation {
         Attestation::verify(report, now)
     }
 }
-

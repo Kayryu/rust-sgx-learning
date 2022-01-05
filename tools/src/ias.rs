@@ -1,11 +1,11 @@
+use log::{debug, error, info};
+use sgx_types::*;
 use std::io::Read;
 use std::io::Write;
 use std::net::TcpStream;
-use std::sync::Arc;
-use std::str;
 use std::prelude::v1::*;
-use sgx_types::*;
-use log::{info, debug, error};
+use std::str;
+use std::sync::Arc;
 
 use crate::error::Error;
 use crate::types::AttestationReport;
@@ -77,7 +77,7 @@ impl Net {
             Err(e) => return Err(Error::NetError(e.to_string())),
         }
         let response = String::from_utf8(plaintext.clone()).unwrap();
-        return Ok(response)
+        return Ok(response);
     }
 
     fn make_ias_client_config() -> rustls::ClientConfig {

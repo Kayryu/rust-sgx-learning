@@ -4,40 +4,40 @@
 #[macro_use]
 extern crate sgx_tstd as std;
 #[cfg(feature = "sgx")]
-extern crate sgx_yasna as yasna;
-#[cfg(feature = "sgx")]
-extern crate sgx_webpki as webpki;
-#[cfg(feature = "sgx")]
 extern crate sgx_base64 as base64;
 #[cfg(feature = "sgx")]
-extern crate sgx_num_bigint as num_bigint;
+extern crate sgx_chrono as chrono;
 #[cfg(feature = "sgx")]
 extern crate sgx_log as log;
 #[cfg(feature = "sgx")]
-extern crate sgx_rustls as rustls;
-#[cfg(feature = "sgx")]
-extern crate sgx_webpki_roots as webpki_roots;
+extern crate sgx_num_bigint as num_bigint;
 #[cfg(feature = "sgx")]
 extern crate sgx_rand as rand;
 #[cfg(feature = "sgx")]
-extern crate sgx_chrono as chrono;
+extern crate sgx_rustls as rustls;
+#[cfg(feature = "sgx")]
+extern crate sgx_webpki as webpki;
+#[cfg(feature = "sgx")]
+extern crate sgx_webpki_roots as webpki_roots;
+#[cfg(feature = "sgx")]
+extern crate sgx_yasna as yasna;
 
+mod attestation;
 mod certificate;
 mod error;
-mod attestation;
 #[cfg(feature = "sgx")]
 mod ias;
 mod traits;
 mod types;
 
+pub use attestation::Attestation;
 pub use certificate::RaX509Cert;
 pub use error::Error;
-pub use traits::AttestationReportVerifier;
-pub use types::*;
 #[cfg(feature = "sgx")]
 pub use ias::Net;
-pub use attestation::Attestation;
 pub use sgx_types::sgx_quote_sign_type_t;
+pub use traits::AttestationReportVerifier;
+pub use types::*;
 
 use std::prelude::v1::*;
 
@@ -61,12 +61,15 @@ cargo.toml
 
 */
 
-
 use sgx_types::*;
 use std::char;
 
 #[cfg(feature = "sgx")]
-pub fn gen_ecc_cert_with_sign_type(spid: String, ias_key: String, sign_type: sgx_quote_sign_type_t) -> Result<(Vec<u8>, Vec<u8>), Error> {
+pub fn gen_ecc_cert_with_sign_type(
+    spid: String,
+    ias_key: String,
+    sign_type: sgx_quote_sign_type_t,
+) -> Result<(Vec<u8>, Vec<u8>), Error> {
     use sgx_tcrypto::*;
     // Generate Keypair
     let ecc_handle = SgxEccHandle::new();
@@ -91,7 +94,7 @@ pub(crate) fn into_attition(pub_k: sgx_ec256_public_t) -> [u8; 64] {
     pub_k_gx.reverse();
     let mut pub_k_gy = pub_k.gy.clone();
     pub_k_gy.reverse();
-    let mut addition:[u8; 64] = [0u8; 64];
+    let mut addition: [u8; 64] = [0u8; 64];
     addition[..32].clone_from_slice(&pub_k_gx);
     addition[32..].clone_from_slice(&pub_k_gy);
     addition
@@ -148,21 +151,32 @@ impl Utils {
 
 #[cfg(test)]
 mod tests {
-    const c_prv_k: [u8;32] = [44, 227, 141, 100, 114, 207, 218, 155, 139, 188, 37, 197, 185, 21, 193, 87, 88, 54, 231, 73, 151, 162, 195, 83, 151, 147, 6, 48, 26, 47, 10, 226];
-    const c_pub_k_gx: [u8;32] = [74, 145, 120, 205, 221, 0, 154, 144, 163, 82, 192, 196, 1, 15, 118, 75, 209, 154, 237, 169, 167, 41, 150, 215, 244, 154, 243, 39, 50, 184, 78, 148];
-    const c_pub_k_gy: [u8;32] = [146, 163, 127, 120, 250, 35, 208, 197, 56, 239, 187, 69, 194, 96, 236, 87, 96, 201, 19, 37, 24, 126, 229, 213, 59, 96, 112, 4, 165, 220, 160, 51];
+    const c_prv_k: [u8; 32] = [
+        44, 227, 141, 100, 114, 207, 218, 155, 139, 188, 37, 197, 185, 21, 193, 87, 88, 54, 231, 73, 151, 162, 195, 83,
+        151, 147, 6, 48, 26, 47, 10, 226,
+    ];
+    const c_pub_k_gx: [u8; 32] = [
+        74, 145, 120, 205, 221, 0, 154, 144, 163, 82, 192, 196, 1, 15, 118, 75, 209, 154, 237, 169, 167, 41, 150, 215,
+        244, 154, 243, 39, 50, 184, 78, 148,
+    ];
+    const c_pub_k_gy: [u8; 32] = [
+        146, 163, 127, 120, 250, 35, 208, 197, 56, 239, 187, 69, 194, 96, 236, 87, 96, 201, 19, 37, 24, 126, 229, 213,
+        59, 96, 112, 4, 165, 220, 160, 51,
+    ];
 
-
-    #[cfg(feature="sgx")]
+    #[cfg(feature = "sgx")]
     #[test]
     fn example() {
         // load files
         let spid: String = "22aa549a2d5e47a2933a753c1cae947c".to_string();
         let key: String = "22aa549a2d5e47a2933a753c1cae947c".to_string();
-        
-        let prv_k: sgx_ec256_private_t = sgx_ec256_private_t {r: c_prv_k.clone()};
-        let pub_k: sgx_ec256_public_t = sgx_ec256_public_t { gx: c_pub_k_gx.clone(), gy: c_pub_k_gy.clone()};
-    
+
+        let prv_k: sgx_ec256_private_t = sgx_ec256_private_t { r: c_prv_k.clone() };
+        let pub_k: sgx_ec256_public_t = sgx_ec256_public_t {
+            gx: c_pub_k_gx.clone(),
+            gy: c_pub_k_gy.clone(),
+        };
+
         // init net
         // let net = Net::new(spid, key);
 

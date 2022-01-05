@@ -1,5 +1,5 @@
-use std::prelude::v1::*;
 use crate::error::Error;
+use std::prelude::v1::*;
 
 const SEPARATOR: u8 = 0x7Cu8;
 
@@ -44,7 +44,5 @@ mod tests {
     use serde_json::*;
 
     #[test]
-    fn test_report_into_payload() {
-        
-    }
+    fn test_report_into_payload() {}
 }

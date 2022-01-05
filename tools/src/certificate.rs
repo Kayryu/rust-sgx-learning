@@ -10,16 +10,16 @@ use bit_vec::BitVec;
 use chrono::Duration;
 use chrono::TimeZone;
 use chrono::Utc as TzUtc;
-use num_bigint::BigUint;
-use log::error;
 use itertools::Itertools;
+use log::error;
+use num_bigint::BigUint;
 
 #[cfg(feature = "sgx")]
-use yasna::models::ObjectIdentifier;
+use crate::std::untrusted::time::SystemTimeEx;
 #[cfg(feature = "sgx")]
 use sgx_tcrypto::SgxEccHandle;
 #[cfg(feature = "sgx")]
-use crate::std::untrusted::time::SystemTimeEx;
+use yasna::models::ObjectIdentifier;
 
 use crate::error::Error;
 use crate::traits::AttestationReportVerifier;
@@ -249,7 +249,11 @@ where
         let enclave = V::verify(&report, now)?;
 
         if enclave.report_data != pub_k.to_vec() {
-            error!("report_data[{:02x}] not equal public_key[{:02x}]", enclave.report_data.iter().format(""), pub_k.iter().format(""));
+            error!(
+                "report_data[{:02x}] not equal public_key[{:02x}]",
+                enclave.report_data.iter().format(""),
+                pub_k.iter().format("")
+            );
             return Err(Error::InvalidPublicKey);
         }
         return Ok(enclave);
